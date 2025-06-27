@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cockpit Operacional - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #343a40; color: white; padding: 1rem; text-align: center; }
+        .cockpit-container { display: flex; justify-content: space-around; gap: 1rem; padding: 1rem; }
+        .cockpit-column { flex: 1; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 1rem; }
+        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
+        th { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Cockpit de Operação</h1>
+    </header>
+    <main class="cockpit-container">
+        
+        <section class="cockpit-column">
+            <h2>Em Execução (<span id="in-progress-count">0</span>)</h2>
+            <table id="in-progress-table">
+                <thead>
+                    <tr>
+                        <th>Prazo</th>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                    </tr>
+                </thead>
+                <tbody id="in-progress-tbody"></tbody>
+            </table>
+        </section>
+
+        <section class="cockpit-column">
+            <h2>Aguardando Entrega (<span id="awaiting-delivery-count">0</span>)</h2>
+            <table id="awaiting-delivery-table">
+                <thead>
+                    <tr>
+                        <th>Concluído em</th>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                    </tr>
+                </thead>
+                <tbody id="awaiting-delivery-tbody"></tbody>
+            </table>
+        </section>
+
+        <section class="cockpit-column">
+            <h2>Aguardando Retirada (<span id="awaiting-pickup-count">0</span>)</h2>
+            <table id="awaiting-pickup-table">
+                <thead>
+                    <tr>
+                        <th>Concluído em</th>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                    </tr>
+                </thead>
+                <tbody id="awaiting-pickup-tbody"></tbody>
+            </table>
+        </section>
+
+    </main>
+    <script src="/static/cockpit.js"></script>
+</body>
+</html>

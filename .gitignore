@@ -1,0 +1,40 @@
+# Ambiente Virtual
+# Pasta que contém as dependências Python do projeto
+venv/
+env/
+*.env
+
+# Arquivos de Bytecode e Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de configuração de editores e IDEs
+.vscode/
+.idea/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Banco de dados SQLite (caso decida ter um local para o painel no futuro)
+*.sqlite3
+*.db
+*.db-journal
+
+# Arquivos de configuração do Flask
+instance/
+
+# Arquivos de log
+*.log
+
+# Arquivos de dependências do Poetry (alternativa ao venv)
+poetry.lock
+.pids/
+.pybuild/
+
+# Arquivos de build e distribuição
+dist/
+build/
+*.egg-info/

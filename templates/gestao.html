@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cockpit de Gestão - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #007bff; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; }
+        .kpi-container { display: flex; justify-content: space-around; gap: 1rem; margin-bottom: 2rem; }
+        .kpi-card { flex: 1; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 1.5rem; text-align: center; }
+        .kpi-title { font-size: 1rem; color: #6c757d; margin-bottom: 0.5rem; }
+        .kpi-value { font-size: 2rem; font-weight: bold; color: #343a40; }
+        .kpi-value.pending { color: #dc3545; }
+        .content-section { background-color: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
+    </style>
+</head>
+<body>
+    <header><h1>Cockpit de Gestão Financeira</h1></header>
+    <main>
+        <section class="kpi-container">
+            <div class="kpi-card">
+                <div class="kpi-title">Faturamento Bruto</div>
+                <div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Total Recebido</div>
+                <div class="kpi-value" id="kpi-total-received">R$ 0,00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">A Receber (Pendente)</div>
+                <div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Pedidos com Saldo Devedor</h2>
+            <table id="pending-orders-table">
+                <thead>
+                    <tr>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Valor Total</th>
+                        <th>Valor Pago</th>
+                        <th>A Receber</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+    </main>
+    <script src="/static/gestao.js"></script>
+</body>
+</html>

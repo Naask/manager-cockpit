@@ -1,20 +1,33 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Função para formatar números para o padrão monetário brasileiro
+    const filterButton = document.getElementById('filter-button');
+    const clearButton = document.getElementById('clear-filter-button');
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+
     function formatCurrency(amountInCents) {
         if (amountInCents === null || amountInCents === undefined) return 'R$ 0,00';
         const amount = amountInCents / 100;
         return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    async function fetchFinancialData() {
+    async function fetchFinancialData(startDate, endDate) {
         try {
-            const response = await fetch('/api/gestao/financial-summary');
+            // Constrói a URL com os parâmetros de data, apenas se eles forem fornecidos
+            let url = '/api/gestao/financial-summary';
+            if (startDate && endDate) {
+                url += `?start_date=${startDate}&end_date=${endDate}`;
+            }
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.statusText}`);
+            }
             const data = await response.json();
 
             // 1. Preenche os KPIs
             const kpis = data.kpis;
-            const pendingBalance = kpis.gross_revenue - kpis.total_received;
+            const pendingBalance = (kpis.gross_revenue || 0) - (kpis.total_received || 0);
             
             document.getElementById('kpi-gross-revenue').textContent = formatCurrency(kpis.gross_revenue);
             document.getElementById('kpi-total-received').textContent = formatCurrency(kpis.total_received);
@@ -22,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 2. Preenche a tabela de Pedidos Pendentes
             const tableBody = document.querySelector('#pending-orders-table tbody');
-            tableBody.innerHTML = ''; // Limpa a tabela antes de preencher
+            tableBody.innerHTML = ''; 
 
             data.pending_orders.forEach(order => {
                 const row = tableBody.insertRow();
@@ -39,8 +52,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Erro ao buscar dados financeiros:", error);
+            alert("Não foi possível carregar os dados financeiros. Verifique o console para mais detalhes.");
         }
     }
 
+    // Listener para o botão de filtro
+    filterButton.addEventListener('click', () => {
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        // Permite a busca mesmo com as datas em branco
+        fetchFinancialData(startDate, endDate);
+    });
+
+    // Listener para o novo botão de limpar
+    clearButton.addEventListener('click', () => {
+        startDateInput.value = '';
+        endDateInput.value = '';
+        // Chama a função sem parâmetros para carregar todos os períodos
+        fetchFinancialData();
+    });
+
+    // Carrega os dados de todos os tempos ao iniciar a página
     fetchFinancialData();
 });

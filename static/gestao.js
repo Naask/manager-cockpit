@@ -31,48 +31,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
 
-            // 1. Preenche os KPIs e suas contagens
-            const kpis = data.kpis;
-            const pendingBalance = (kpis.gross_revenue || 0) - (kpis.total_received || 0);
+            // 1. Preenche os KPIs de pedidos CONCLUÍDOS
+            const completedKpis = data.completed_kpis;
+            const pendingBalance = (completedKpis.gross_revenue || 0) - (completedKpis.total_received || 0);
             
-            document.getElementById('kpi-gross-revenue').textContent = formatCurrency(kpis.gross_revenue);
-            document.getElementById('kpi-total-received').textContent = formatCurrency(kpis.total_received);
+            document.getElementById('kpi-gross-revenue').textContent = formatCurrency(completedKpis.gross_revenue);
+            document.getElementById('kpi-total-received').textContent = formatCurrency(completedKpis.total_received);
             document.getElementById('kpi-pending-balance').textContent = formatCurrency(pendingBalance);
             
-            // Preenche as contagens
-            document.getElementById('kpi-orders-count').textContent = kpis.orders_count || 0;
-            document.getElementById('kpi-paid-orders-count').textContent = kpis.paid_orders_count || 0;
+            document.getElementById('kpi-orders-count').textContent = completedKpis.orders_count || 0;
+            document.getElementById('kpi-paid-orders-count').textContent = completedKpis.paid_orders_count || 0;
             document.getElementById('pending-orders-count').textContent = data.pending_orders.length;
 
-            // 2. Preenche a tabela de Pedidos Pendentes e sua contagem
+            // 2. Preenche os KPIs de pedidos em ABERTO (Contagens e Valores)
+            const openKpis = data.open_orders_kpis;
+            document.getElementById('kpi-total-open-count').textContent = openKpis.total_open_count || 0;
+            document.getElementById('kpi-total-open-value').textContent = formatCurrency(openKpis.total_open_value);
+            document.getElementById('kpi-open-unpaid-count').textContent = openKpis.open_and_unpaid_count || 0;
+            document.getElementById('kpi-open-unpaid-value').textContent = formatCurrency(openKpis.open_and_unpaid_value);
+            document.getElementById('kpi-open-paid-count').textContent = openKpis.open_and_paid_count || 0;
+            document.getElementById('kpi-open-paid-value').textContent = formatCurrency(openKpis.open_and_paid_value);
+
+            // 3. Preenche a tabela de Pedidos Pendentes
             const pendingTableBody = document.querySelector('#pending-orders-table tbody');
             pendingTableBody.innerHTML = '';
             document.getElementById('pending-orders-count2').textContent = data.pending_orders.length;
             data.pending_orders.forEach(order => {
                 const row = pendingTableBody.insertRow();
-                const status = order.payment_status.replace('_', ' ');
-                row.innerHTML = `
-                    <td>${order.order_id}</td>
-                    <td>${order.customer_name}</td>
-                    <td>${status}</td>
-                    <td>${formatCurrency(order.total_amount)}</td>
-                    <td>${formatCurrency(order.total_paid)}</td>
-                    <td><strong>${formatCurrency(order.remaining_balance)}</strong></td>
-                `;
+                row.innerHTML = `<td>${order.order_id}</td><td>${order.customer_name}</td><td>${order.payment_status.replace('_', ' ')}</td><td>${formatCurrency(order.total_amount)}</td><td>${formatCurrency(order.total_paid)}</td><td><strong>${formatCurrency(order.remaining_balance)}</strong></td>`;
             });
 
-            // 3. Preenche a tabela de Todos os Pedidos Concluídos e sua contagem
+            // 4. Preenche a tabela de Todos os Pedidos Concluídos
             const completedTableBody = document.querySelector('#all-completed-orders-table tbody');
             completedTableBody.innerHTML = '';
             document.getElementById('all-completed-orders-count').textContent = data.all_completed_orders.length;
             data.all_completed_orders.forEach(order => {
                 const row = completedTableBody.insertRow();
-                row.innerHTML = `
-                    <td>${formatDate(order.completed_at)}</td>
-                    <td>${order.order_id}</td>
-                    <td>${order.customer_name}</td>
-                    <td>${formatCurrency(order.total_amount)}</td>
-                `;
+                row.innerHTML = `<td>${formatDate(order.completed_at)}</td><td>${order.order_id}</td><td>${order.customer_name}</td><td>${formatCurrency(order.total_amount)}</td>`;
             });
 
         } catch (error) {

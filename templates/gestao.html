@@ -20,6 +20,8 @@
         .kpi-value.pending { color: #dc3545; }
         .content-section { background-color: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 2rem; }
         h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
+        /* A contagem herda o estilo do pai (h2 ou kpi-title) */
+        h2 span, .kpi-title span { font-weight: normal; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
     </style>
@@ -37,13 +39,22 @@
         </div>
 
         <section class="kpi-container">
-            <div class="kpi-card"><div class="kpi-title">Faturamento Bruto (Período)</div><div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div></div>
-            <div class="kpi-card"><div class="kpi-title">Total Recebido (Período)</div><div class="kpi-value" id="kpi-total-received">R$ 0,00</div></div>
-            <div class="kpi-card"><div class="kpi-title">A Receber (Período)</div><div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div></div>
+            <div class="kpi-card">
+                <div class="kpi-title">Faturamento Bruto <span>(<span id="kpi-orders-count">0</span> pedidos)</span></div>
+                <div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Total Recebido <span>(<span id="kpi-paid-orders-count">0</span> pedidos)</span></div>
+                <div class="kpi-value" id="kpi-total-received">R$ 0,00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">A Receber <span>(<span id="pending-orders-count">0</span> pedidos)</span></div>
+                <div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div>
+            </div>
         </section>
 
         <section class="content-section">
-            <h2>Pedidos Concluídos com Saldo Devedor (Período)</h2>
+            <h2>Pedidos Concluídos com Saldo Devedor <span>(<span id="pending-orders-count2">0</span>)</span></h2>
             <table id="pending-orders-table">
                 <thead>
                     <tr>
@@ -60,7 +71,7 @@
         </section>
 
         <section class="content-section">
-            <h2>Todos os Pedidos Concluídos (Período)</h2>
+            <h2>Todos os Pedidos Concluídos <span>(<span id="all-completed-orders-count">0</span>)</span></h2>
             <table id="all-completed-orders-table">
                 <thead>
                     <tr>

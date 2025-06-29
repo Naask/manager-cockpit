@@ -55,14 +55,16 @@ def get_financial_summary():
     
     final_where_clause = f"WHERE {' AND '.join(where_clauses)}"
 
-    # Query para KPIs de Faturamento Bruto e Total Recebido
+    # Query para KPIs, agora com contagem de pedidos pagos
     kpi_query = f"""
         WITH FilteredOrders AS (
             SELECT order_id, total_amount FROM orders o {final_where_clause}
         )
         SELECT
+            (SELECT COUNT(order_id) FROM FilteredOrders) as orders_count,
             (SELECT SUM(total_amount) FROM FilteredOrders) as gross_revenue,
-            (SELECT SUM(p.amount) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as total_received;
+            (SELECT SUM(p.amount) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as total_received,
+            (SELECT COUNT(DISTINCT p.order_id) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as paid_orders_count;
     """
     kpis = conn.execute(kpi_query, params).fetchone()
 
@@ -83,7 +85,7 @@ def get_financial_summary():
     """
     pending_orders = conn.execute(pending_orders_query, params).fetchall()
     
-    # NOVA QUERY: Busca todos os pedidos concluídos no período
+    # Query para todos os pedidos concluídos no período
     all_completed_query = f"""
         SELECT
             o.order_id, c.name as customer_name, o.completed_at, o.total_amount
@@ -97,9 +99,9 @@ def get_financial_summary():
     conn.close()
 
     return jsonify({
-        'kpis': dict(kpis) if kpis else {'gross_revenue': 0, 'total_received': 0},
+        'kpis': dict(kpis) if kpis else {'orders_count': 0, 'gross_revenue': 0, 'total_received': 0, 'paid_orders_count': 0},
         'pending_orders': [dict(row) for row in pending_orders],
-        'all_completed_orders': [dict(row) for row in all_completed_orders] # NOVO DADO
+        'all_completed_orders': [dict(row) for row in all_completed_orders]
     })
 
 @app.route('/gestao')

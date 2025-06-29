@@ -31,17 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
 
-            // 1. Preenche os KPIs
+            // 1. Preenche os KPIs e suas contagens
             const kpis = data.kpis;
             const pendingBalance = (kpis.gross_revenue || 0) - (kpis.total_received || 0);
             
             document.getElementById('kpi-gross-revenue').textContent = formatCurrency(kpis.gross_revenue);
             document.getElementById('kpi-total-received').textContent = formatCurrency(kpis.total_received);
             document.getElementById('kpi-pending-balance').textContent = formatCurrency(pendingBalance);
+            
+            // Preenche as contagens
+            document.getElementById('kpi-orders-count').textContent = kpis.orders_count || 0;
+            document.getElementById('kpi-paid-orders-count').textContent = kpis.paid_orders_count || 0;
+            document.getElementById('pending-orders-count').textContent = data.pending_orders.length;
 
-            // 2. Preenche a tabela de Pedidos Pendentes
+            // 2. Preenche a tabela de Pedidos Pendentes e sua contagem
             const pendingTableBody = document.querySelector('#pending-orders-table tbody');
-            pendingTableBody.innerHTML = ''; 
+            pendingTableBody.innerHTML = '';
+            document.getElementById('pending-orders-count2').textContent = data.pending_orders.length;
             data.pending_orders.forEach(order => {
                 const row = pendingTableBody.insertRow();
                 const status = order.payment_status.replace('_', ' ');
@@ -55,9 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             });
 
-            // 3. NOVA LÓGICA: Preenche a tabela de Todos os Pedidos Concluídos
+            // 3. Preenche a tabela de Todos os Pedidos Concluídos e sua contagem
             const completedTableBody = document.querySelector('#all-completed-orders-table tbody');
             completedTableBody.innerHTML = '';
+            document.getElementById('all-completed-orders-count').textContent = data.all_completed_orders.length;
             data.all_completed_orders.forEach(order => {
                 const row = completedTableBody.insertRow();
                 row.innerHTML = `

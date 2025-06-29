@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('kpi-paid-orders-count').textContent = completedKpis.paid_orders_count || 0;
             document.getElementById('pending-orders-count').textContent = data.pending_orders.length;
 
-            // 2. Preenche os KPIs de pedidos em ABERTO (Contagens e Valores)
+            // 2. Preenche os KPIs de pedidos em ABERTO
             const openKpis = data.open_orders_kpis;
             document.getElementById('kpi-total-open-count').textContent = openKpis.total_open_count || 0;
             document.getElementById('kpi-total-open-value').textContent = formatCurrency(openKpis.total_open_value);
@@ -68,6 +68,24 @@ document.addEventListener('DOMContentLoaded', () => {
             data.all_completed_orders.forEach(order => {
                 const row = completedTableBody.insertRow();
                 row.innerHTML = `<td>${formatDate(order.completed_at)}</td><td>${order.order_id}</td><td>${order.customer_name}</td><td>${formatCurrency(order.total_amount)}</td>`;
+            });
+
+            // 5. Preenche a tabela de Todos os Pedidos em Andamento
+            const inProgressTableBody = document.querySelector('#in-progress-orders-table tbody');
+            inProgressTableBody.innerHTML = '';
+            document.getElementById('in-progress-orders-count').textContent = data.in_progress_orders.length;
+            data.in_progress_orders.forEach(order => {
+                const row = inProgressTableBody.insertRow();
+                const executionStatus = order.execution_status.replace(/_/g, ' ');
+                const paymentStatus = order.payment_status.replace(/_/g, ' ');
+                row.innerHTML = `
+                    <td>${order.order_id}</td>
+                    <td>${order.customer_name}</td>
+                    <td>${executionStatus}</td>
+                    <td>${formatDate(order.pickup_datetime)}</td>
+                    <td>${paymentStatus}</td>
+                    <td>${formatCurrency(order.total_amount)}</td>
+                `;
             });
 
         } catch (error) {

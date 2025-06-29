@@ -74,7 +74,7 @@ def get_financial_summary():
     all_completed_query = f"SELECT o.order_id, c.name as customer_name, o.completed_at, o.total_amount FROM orders o JOIN customers c ON o.customer_id = c.customer_id {final_where_clause_completed} ORDER BY o.completed_at DESC;"
     all_completed_orders = conn.execute(all_completed_query, params).fetchall()
 
-    # --- NOVA QUERY para KPIs de Pedidos em ABERTO, agora com valores ---
+    # Query para KPIs de Pedidos em ABERTO (não filtrável por data)
     open_orders_kpis_query = """
         WITH OpenOrders AS (
             SELECT order_id, total_amount, payment_status FROM orders WHERE execution_status != 'CONCLUIDO'
@@ -89,13 +89,31 @@ def get_financial_summary():
     """
     open_orders_kpis = conn.execute(open_orders_kpis_query).fetchone()
 
+    # Query para a lista de todos os pedidos em andamento
+    # ALTERAÇÃO: Adicionamos os campos de pagamento e valor.
+    in_progress_orders_query = """
+        SELECT
+            o.order_id,
+            c.name as customer_name,
+            o.execution_status,
+            o.pickup_datetime,
+            o.payment_status,
+            o.total_amount
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.customer_id
+        WHERE o.execution_status != 'CONCLUIDO'
+        ORDER BY o.pickup_datetime ASC, o.created_at ASC;
+    """
+    in_progress_orders = conn.execute(in_progress_orders_query).fetchall()
+
     conn.close()
 
     return jsonify({
-        'completed_kpis': dict(completed_kpis) if completed_kpis else {'orders_count': 0, 'gross_revenue': 0, 'total_received': 0, 'paid_orders_count': 0},
+        'completed_kpis': dict(completed_kpis) if completed_kpis else {},
         'pending_orders': [dict(row) for row in pending_orders],
         'all_completed_orders': [dict(row) for row in all_completed_orders],
-        'open_orders_kpis': dict(open_orders_kpis) if open_orders_kpis else {}
+        'open_orders_kpis': dict(open_orders_kpis) if open_orders_kpis else {},
+        'in_progress_orders': [dict(row) for row in in_progress_orders]
     })
 
 @app.route('/gestao')

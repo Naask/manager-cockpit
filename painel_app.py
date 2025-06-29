@@ -36,7 +36,7 @@ def cockpit_page():
     return render_template('cockpit.html')
 
 
-# --- ROTAS E ENDPOINTS DO COCKPIT DE GESTÃO (COM FILTRO DE DATAS) ---
+# --- ROTAS E ENDPOINTS DO COCKPIT DE GESTÃO ---
 
 @app.route('/api/gestao/financial-summary')
 def get_financial_summary():
@@ -51,7 +51,6 @@ def get_financial_summary():
     where_clauses = ["o.execution_status = 'CONCLUIDO'"]
     if start_date and end_date:
         where_clauses.append("o.completed_at BETWEEN ? AND ?")
-        # CORREÇÃO: Usando 'T' para o formato do timestamp para corresponder ao banco de dados.
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
     
     final_where_clause = f"WHERE {' AND '.join(where_clauses)}"
@@ -69,7 +68,6 @@ def get_financial_summary():
 
     # Query para Pedidos Pendentes
     pending_where_clause = f"{final_where_clause} AND o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')"
-    
     pending_orders_query = f"""
         SELECT
             o.order_id, c.name as customer_name, o.total_amount, o.payment_status,
@@ -85,11 +83,23 @@ def get_financial_summary():
     """
     pending_orders = conn.execute(pending_orders_query, params).fetchall()
     
+    # NOVA QUERY: Busca todos os pedidos concluídos no período
+    all_completed_query = f"""
+        SELECT
+            o.order_id, c.name as customer_name, o.completed_at, o.total_amount
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.customer_id
+        {final_where_clause}
+        ORDER BY o.completed_at DESC;
+    """
+    all_completed_orders = conn.execute(all_completed_query, params).fetchall()
+
     conn.close()
 
     return jsonify({
         'kpis': dict(kpis) if kpis else {'gross_revenue': 0, 'total_received': 0},
-        'pending_orders': [dict(row) for row in pending_orders]
+        'pending_orders': [dict(row) for row in pending_orders],
+        'all_completed_orders': [dict(row) for row in all_completed_orders] # NOVO DADO
     })
 
 @app.route('/gestao')

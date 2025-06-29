@@ -10,10 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const amount = amountInCents / 100;
         return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
+    
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year:'numeric', hour: '2-digit', minute: '2-digit'
+        });
+    }
 
     async function fetchFinancialData(startDate, endDate) {
         try {
-            // Constrói a URL com os parâmetros de data, apenas se eles forem fornecidos
             let url = '/api/gestao/financial-summary';
             if (startDate && endDate) {
                 url += `?start_date=${startDate}&end_date=${endDate}`;
@@ -34,11 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('kpi-pending-balance').textContent = formatCurrency(pendingBalance);
 
             // 2. Preenche a tabela de Pedidos Pendentes
-            const tableBody = document.querySelector('#pending-orders-table tbody');
-            tableBody.innerHTML = ''; 
-
+            const pendingTableBody = document.querySelector('#pending-orders-table tbody');
+            pendingTableBody.innerHTML = ''; 
             data.pending_orders.forEach(order => {
-                const row = tableBody.insertRow();
+                const row = pendingTableBody.insertRow();
                 const status = order.payment_status.replace('_', ' ');
                 row.innerHTML = `
                     <td>${order.order_id}</td>
@@ -50,28 +55,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             });
 
+            // 3. NOVA LÓGICA: Preenche a tabela de Todos os Pedidos Concluídos
+            const completedTableBody = document.querySelector('#all-completed-orders-table tbody');
+            completedTableBody.innerHTML = '';
+            data.all_completed_orders.forEach(order => {
+                const row = completedTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${formatDate(order.completed_at)}</td>
+                    <td>${order.order_id}</td>
+                    <td>${order.customer_name}</td>
+                    <td>${formatCurrency(order.total_amount)}</td>
+                `;
+            });
+
         } catch (error) {
             console.error("Erro ao buscar dados financeiros:", error);
             alert("Não foi possível carregar os dados financeiros. Verifique o console para mais detalhes.");
         }
     }
 
-    // Listener para o botão de filtro
     filterButton.addEventListener('click', () => {
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
-        // Permite a busca mesmo com as datas em branco
         fetchFinancialData(startDate, endDate);
     });
 
-    // Listener para o novo botão de limpar
     clearButton.addEventListener('click', () => {
         startDateInput.value = '';
         endDateInput.value = '';
-        // Chama a função sem parâmetros para carregar todos os períodos
         fetchFinancialData();
     });
 
-    // Carrega os dados de todos os tempos ao iniciar a página
     fetchFinancialData();
 });

@@ -18,7 +18,7 @@
         .kpi-title { font-size: 1rem; color: #6c757d; margin-bottom: 0.5rem; }
         .kpi-value { font-size: 2rem; font-weight: bold; color: #343a40; }
         .kpi-value.pending { color: #dc3545; }
-        .content-section { background-color: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .content-section { background-color: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 2rem; }
         h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
@@ -37,18 +37,9 @@
         </div>
 
         <section class="kpi-container">
-            <div class="kpi-card">
-                <div class="kpi-title">Faturamento Bruto (Período)</div>
-                <div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-title">Total Recebido (Período)</div>
-                <div class="kpi-value" id="kpi-total-received">R$ 0,00</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-title">A Receber (Período)</div>
-                <div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div>
-            </div>
+            <div class="kpi-card"><div class="kpi-title">Faturamento Bruto (Período)</div><div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div></div>
+            <div class="kpi-card"><div class="kpi-title">Total Recebido (Período)</div><div class="kpi-value" id="kpi-total-received">R$ 0,00</div></div>
+            <div class="kpi-card"><div class="kpi-title">A Receber (Período)</div><div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div></div>
         </section>
 
         <section class="content-section">
@@ -58,10 +49,25 @@
                     <tr>
                         <th>Pedido #</th>
                         <th>Cliente</th>
-                        <th>Status</th>
+                        <th>Status Pagamento</th>
                         <th>Valor Total</th>
                         <th>Valor Pago</th>
                         <th>A Receber</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Todos os Pedidos Concluídos (Período)</h2>
+            <table id="all-completed-orders-table">
+                <thead>
+                    <tr>
+                        <th>Concluído em</th>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                        <th>Valor Total</th>
                     </tr>
                 </thead>
                 <tbody></tbody>

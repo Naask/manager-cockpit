@@ -67,8 +67,21 @@ def get_financial_summary():
     """
     completed_kpis = conn.execute(completed_kpi_query, params).fetchone()
 
+    # Query para Pedidos Pendentes - CORREÇÕES APLICADAS
     pending_where_clause = f"{final_where_clause_completed} AND o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')"
-    pending_orders_query = f"SELECT o.order_id, c.name as customer_name, o.total_amount, o.payment_status, COALESCE(p.total_paid, 0) as total_paid, (o.total_amount - COALESCE(p.total_paid, 0)) as remaining_balance FROM orders o JOIN customers c ON o.customer_id = c.customer_id LEFT JOIN (SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id) p ON o.order_id = p.order_id {pending_where_clause} ORDER BY o.created_at DESC;"
+    pending_orders_query = f"""
+        SELECT
+            o.order_id, c.name as customer_name, o.total_amount, o.payment_status, o.completed_at,
+            COALESCE(p.total_paid, 0) as total_paid,
+            (o.total_amount - COALESCE(p.total_paid, 0)) as remaining_balance
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.customer_id
+        LEFT JOIN (
+            SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id
+        ) p ON o.order_id = p.order_id
+        {pending_where_clause}
+        ORDER BY o.completed_at DESC;
+    """
     pending_orders = conn.execute(pending_orders_query, params).fetchall()
     
     all_completed_query = f"SELECT o.order_id, c.name as customer_name, o.completed_at, o.total_amount FROM orders o JOIN customers c ON o.customer_id = c.customer_id {final_where_clause_completed} ORDER BY o.completed_at DESC;"
@@ -90,17 +103,11 @@ def get_financial_summary():
     open_orders_kpis = conn.execute(open_orders_kpis_query).fetchone()
 
     # Query para a lista de todos os pedidos em andamento
-    # ALTERAÇÃO: Adicionamos os campos de pagamento e valor.
     in_progress_orders_query = """
         SELECT
-            o.order_id,
-            c.name as customer_name,
-            o.execution_status,
-            o.pickup_datetime,
-            o.payment_status,
-            o.total_amount
-        FROM orders o
-        JOIN customers c ON o.customer_id = c.customer_id
+            o.order_id, c.name as customer_name, o.execution_status,
+            o.pickup_datetime, o.payment_status, o.total_amount
+        FROM orders o JOIN customers c ON o.customer_id = c.customer_id
         WHERE o.execution_status != 'CONCLUIDO'
         ORDER BY o.pickup_datetime ASC, o.created_at ASC;
     """

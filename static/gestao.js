@@ -52,13 +52,22 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('kpi-open-paid-count').textContent = openKpis.open_and_paid_count || 0;
             document.getElementById('kpi-open-paid-value').textContent = formatCurrency(openKpis.open_and_paid_value);
 
-            // 3. Preenche a tabela de Pedidos Pendentes
+            // 3. Preenche a tabela de Pedidos Pendentes (CORRIGIDO)
             const pendingTableBody = document.querySelector('#pending-orders-table tbody');
             pendingTableBody.innerHTML = '';
             document.getElementById('pending-orders-count2').textContent = data.pending_orders.length;
             data.pending_orders.forEach(order => {
                 const row = pendingTableBody.insertRow();
-                row.innerHTML = `<td>${order.order_id}</td><td>${order.customer_name}</td><td>${order.payment_status.replace('_', ' ')}</td><td>${formatCurrency(order.total_amount)}</td><td>${formatCurrency(order.total_paid)}</td><td><strong>${formatCurrency(order.remaining_balance)}</strong></td>`;
+                const status = order.payment_status.replace('_', ' ');
+                row.innerHTML = `
+                    <td>${formatDate(order.completed_at)}</td>
+                    <td>${order.order_id}</td>
+                    <td>${order.customer_name}</td>
+                    <td>${status}</td>
+                    <td>${formatCurrency(order.total_amount)}</td>
+                    <td>${formatCurrency(order.total_paid)}</td>
+                    <td><strong>${formatCurrency(order.remaining_balance)}</strong></td>
+                `;
             });
 
             // 4. Preenche a tabela de Todos os Pedidos Concluídos
@@ -78,14 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = inProgressTableBody.insertRow();
                 const executionStatus = order.execution_status.replace(/_/g, ' ');
                 const paymentStatus = order.payment_status.replace(/_/g, ' ');
-                row.innerHTML = `
-                    <td>${order.order_id}</td>
-                    <td>${order.customer_name}</td>
-                    <td>${executionStatus}</td>
-                    <td>${formatDate(order.pickup_datetime)}</td>
-                    <td>${paymentStatus}</td>
-                    <td>${formatCurrency(order.total_amount)}</td>
-                `;
+                row.innerHTML = `<td>${order.order_id}</td><td>${order.customer_name}</td><td>${executionStatus}</td><td>${formatDate(order.pickup_datetime)}</td><td>${paymentStatus}</td><td>${formatCurrency(order.total_amount)}</td>`;
             });
 
         } catch (error) {

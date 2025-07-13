@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Renderiza ou atualiza os gráficos
             renderBarChart('ordersCount', 'ordersCountChart', labels, 'Qtd. de Pedidos', orderCounts, '#36A2EB');
             renderBarChart('revenue', 'revenueChart', labels, 'Faturamento (R$)', revenues, '#4BC0C0');
-            renderBarChart('customersCount', 'customersCountChart', labels, 'Clientes Distintos', customerCounts, '#FF9F40');
+            renderBarChart('customersCount', 'customersCountChart', labels, 'Clientes Distintos', customerCounts, '#36A2EB'); // Cor Ciano
             renderStackedBarChart('customerType', 'customerTypeChart', labels, newCustomerCounts, returningCustomerCounts);
             renderLineChart('ticket', 'ticketChart', 'Ticket Médio (R$)', 'Ticket Mediano (R$)', labels, ticketAverages, ticketMedians);
             renderLineChart('revenuePerCustomer', 'revenuePerCustomerChart', 'Faturamento Médio/Cliente (R$)', 'Faturamento Mediano/Cliente (R$)', labels, revenuePerCustomerAverages, revenuePerCustomerMedians);
@@ -99,25 +99,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // NOVA FUNÇÃO para o gráfico de barras empilhadas
-    function renderStackedBarChart(chartKey, canvasId, labels, newData, returningData) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        if (charts[chartKey]) charts[chartKey].destroy();
-        charts[chartKey] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Clientes Novos', data: newData, backgroundColor: '#FFB347' }, // Laranja
-                    { label: 'Clientes Recorrentes', data: returningData, backgroundColor: '#8A9A5B' } // Verde Musgo
-                ]
-            },
-            options: {
-                plugins: { datalabels: { color: '#ffffff', font: { weight: 'bold' } } },
-                responsive: true,
-                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
-            }
-        });
-    }
+ // NOVA FUNÇÃO para o gráfico de barras empilhadas (ORDEM CORRIGIDA E CORES PADRONIZADAS)
+ function renderStackedBarChart(chartKey, canvasId, labels, newData, returningData) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts.customerType) charts.customerType.destroy(); // Usa a chave correta
+
+    charts.customerType = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Clientes Recorrentes', data: returningData, backgroundColor: '#4BC0C0' }, // Verde Musgo (embaixo)
+                { label: 'Clientes Novos', data: newData, backgroundColor: '#36A2EB' }      // Laranja (em cima)
+            ]
+        },
+        options: {
+            plugins: { datalabels: { color: '#ffffff', font: { weight: 'bold' } } },
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+        }
+    });
+}
     
     function updateCharts() {
         const period = periodSelector.value;

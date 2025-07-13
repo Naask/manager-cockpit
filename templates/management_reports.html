@@ -9,7 +9,7 @@
         main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
         .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .controls-container label { font-weight: bold; }
-        .controls-container input, .controls-container select { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container select, .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
         .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
         #filter-button { background-color: #007bff; }
         #clear-filter-button { background-color: #6c757d; }
@@ -54,9 +54,17 @@
                 <h2>Clientes Distintos por Período</h2>
                 <canvas id="customersCountChart"></canvas>
             </div>
+             <div class="chart-container">
+                <h2>Clientes Novos vs. Recorrentes</h2>
+                <canvas id="customerTypeChart"></canvas>
+            </div>
             <div class="chart-container">
                 <h2>Ticket Médio e Mediano por Período</h2>
                 <canvas id="ticketChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Faturamento por Cliente (Médio e Mediano)</h2>
+                <canvas id="revenuePerCustomerChart"></canvas>
             </div>
         </div>
     </main>

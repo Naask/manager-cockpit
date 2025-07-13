@@ -5,14 +5,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterButton = document.getElementById('filter-button');
     const clearButton = document.getElementById('clear-filter-button');
     
-    // Registra o plugin de rótulos globalmente para todos os gráficos
     Chart.register(ChartDataLabels);
 
     const charts = {
         ordersCount: null,
         revenue: null,
         customersCount: null,
-        ticket: null
+        ticket: null,
+        revenuePerCustomer: null,
+        customerType: null // Novo gráfico
     };
 
     function calculateMedian(numbers) {
@@ -24,10 +25,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return sorted[middle];
     }
+    
+    function calculateAverage(numbers) {
+        if (!numbers || numbers.length === 0) return 0;
+        const sum = numbers.reduce((acc, val) => acc + val, 0);
+        return sum / numbers.length;
+    }
 
     async function fetchAndRenderReports(period, startDate, endDate) {
         try {
-            // Constrói a URL com todos os parâmetros
             let url = `/api/reports/summary?period=${period}`;
             if (startDate && endDate) {
                 url += `&start_date=${startDate}&end_date=${endDate}`;
@@ -40,11 +46,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prepara os dados
             const labels = data.map(item => item.period);
             const orderCounts = data.map(item => item.order_count);
-            const revenues = data.map(item => (item.total_revenue / 100)); // Converte para Reais
+            const revenues = data.map(item => (item.total_revenue / 100));
             const customerCounts = data.map(item => item.distinct_customer_count);
+            const newCustomerCounts = data.map(item => item.new_customer_count);
+            const returningCustomerCounts = data.map(item => item.returning_customer_count);
+            
             const ticketAverages = data.map(item => (item.total_revenue / item.order_count) / 100);
             const ticketMedians = data.map(item => {
                 const values = item.ticket_values ? item.ticket_values.split(',').map(Number) : [0];
+                return calculateMedian(values) / 100;
+            });
+            const revenuePerCustomerAverages = data.map(item => {
+                const values = item.revenue_per_customer_values ? item.revenue_per_customer_values.split(',').map(Number) : [0];
+                return calculateAverage(values) / 100;
+            });
+            const revenuePerCustomerMedians = data.map(item => {
+                const values = item.revenue_per_customer_values ? item.revenue_per_customer_values.split(',').map(Number) : [0];
                 return calculateMedian(values) / 100;
             });
             
@@ -52,64 +69,56 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBarChart('ordersCount', 'ordersCountChart', labels, 'Qtd. de Pedidos', orderCounts, '#36A2EB');
             renderBarChart('revenue', 'revenueChart', labels, 'Faturamento (R$)', revenues, '#4BC0C0');
             renderBarChart('customersCount', 'customersCountChart', labels, 'Clientes Distintos', customerCounts, '#FF9F40');
-            renderLineChart('ticket', 'ticketChart', labels, ticketAverages, ticketMedians);
+            renderStackedBarChart('customerType', 'customerTypeChart', labels, newCustomerCounts, returningCustomerCounts);
+            renderLineChart('ticket', 'ticketChart', 'Ticket Médio (R$)', 'Ticket Mediano (R$)', labels, ticketAverages, ticketMedians);
+            renderLineChart('revenuePerCustomer', 'revenuePerCustomerChart', 'Faturamento Médio/Cliente (R$)', 'Faturamento Mediano/Cliente (R$)', labels, revenuePerCustomerAverages, revenuePerCustomerMedians);
 
         } catch (error) {
             console.error("Erro ao carregar dados dos relatórios:", error);
         }
     }
 
-    // Função genérica para gráficos de barra
     function renderBarChart(chartKey, canvasId, labels, label, data, color) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        if (charts[chartKey]) charts[chartKey].destroy();
+        charts[chartKey] = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: color }] },
+            options: { plugins: { datalabels: { anchor: 'end', align: 'end', formatter: (value) => (label.includes('R$') ? value.toFixed(2) : value), color: '#555' } }, scales: { y: { beginAtZero: true } } }
+        });
+    }
+
+    function renderLineChart(chartKey, canvasId, label1, label2, labels, data1, data2) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        if (charts[chartKey]) charts[chartKey].destroy();
+        charts[chartKey] = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: [ { label: label1, data: data1, borderColor: '#FF6384', backgroundColor: '#FF6384' }, { label: label2, data: data2, borderColor: '#36A2EB', backgroundColor: '#36A2EB' } ] },
+            options: { plugins: { datalabels: { anchor: 'end', align: 'end', formatter: (value) => `R$ ${value.toFixed(2)}`, backgroundColor: (context) => context.dataset.backgroundColor, color: 'white', borderRadius: 4, padding: 4, font: { size: 10 } } }, scales: { y: { beginAtZero: true } } }
+        });
+    }
+
+    // NOVA FUNÇÃO para o gráfico de barras empilhadas
+    function renderStackedBarChart(chartKey, canvasId, labels, newData, returningData) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         if (charts[chartKey]) charts[chartKey].destroy();
         charts[chartKey] = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
-                datasets: [{ label: label, data: data, backgroundColor: color }]
-            },
-            options: {
-                plugins: {
-                    datalabels: {
-                        anchor: 'end', align: 'end',
-                        formatter: (value) => (label.includes('R$') ? value.toFixed(2) : value),
-                        color: '#555'
-                    }
-                },
-                scales: { y: { beginAtZero: true } }
-            }
-        });
-    }
-
-    // Função para o gráfico de linhas
-    function renderLineChart(chartKey, canvasId, labels, avgData, medianData) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        if (charts[chartKey]) charts[chartKey].destroy();
-        charts[chartKey] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
                 datasets: [
-                    { label: 'Ticket Médio (R$)', data: avgData, borderColor: '#FF6384', backgroundColor: '#FF6384' },
-                    { label: 'Ticket Mediano (R$)', data: medianData, borderColor: '#36A2EB', backgroundColor: '#36A2EB' }
+                    { label: 'Clientes Novos', data: newData, backgroundColor: '#FFB347' }, // Laranja
+                    { label: 'Clientes Recorrentes', data: returningData, backgroundColor: '#8A9A5B' } // Verde Musgo
                 ]
             },
             options: {
-                plugins: {
-                    datalabels: {
-                        anchor: 'end', align: 'end',
-                        formatter: (value) => `R$ ${value.toFixed(2)}`,
-                        backgroundColor: (context) => context.dataset.backgroundColor,
-                        color: 'white', borderRadius: 4, padding: 4, font: { size: 10 }
-                    }
-                },
-                scales: { y: { beginAtZero: true } }
+                plugins: { datalabels: { color: '#ffffff', font: { weight: 'bold' } } },
+                responsive: true,
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
             }
         });
     }
     
-    // Função para unificar a chamada de atualização
     function updateCharts() {
         const period = periodSelector.value;
         const startDate = startDateInput.value;
@@ -117,15 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAndRenderReports(period, startDate, endDate);
     }
 
-    // Listeners para os controles
     periodSelector.addEventListener('change', updateCharts);
     filterButton.addEventListener('click', updateCharts);
     clearButton.addEventListener('click', () => {
         startDateInput.value = '';
         endDateInput.value = '';
-        updateCharts(); // Chama a atualização com as datas limpas
+        updateCharts();
     });
 
-    // Carga inicial
     updateCharts();
 });

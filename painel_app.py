@@ -77,9 +77,7 @@ def get_reports_summary():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    # Mapeia o parâmetro da URL para o formato do strftime do SQLite
     period_formats = {
-        # CORREÇÃO: Usando strftime para formatar o ano e o número da semana corretamente.
         'week': "strftime('%Y-W%W', created_at)",
         'month': "strftime('%Y-%m', created_at)",
         'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
@@ -87,37 +85,62 @@ def get_reports_summary():
         'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
         'year': "strftime('%Y', created_at)"
     }
-    
     period_format = period_formats.get(period, period_formats['month'])
 
-    # Constrói a cláusula WHERE para o filtro de datas
     params = []
     where_clause = ""
     if start_date and end_date:
         where_clause = "WHERE created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
 
+    # CORREÇÃO: Query reescrita para ser mais robusta e correta.
     query = f"""
+        WITH PeriodData AS (
+            SELECT
+                {period_format} as period,
+                customer_id,
+                order_id,
+                total_amount,
+                (SELECT {period_format.replace('created_at', 'MIN(o2.created_at)')} FROM orders o2 WHERE o2.customer_id = o.customer_id) as first_period
+            FROM orders o
+            {where_clause}
+        ),
+        AggregatedData AS (
+            SELECT
+                period,
+                customer_id,
+                SUM(total_amount) as customer_total
+            FROM PeriodData
+            GROUP BY period, customer_id
+        )
         SELECT
-            {period_format} as period,
-            COUNT(order_id) as order_count,
-            SUM(total_amount) as total_revenue,
-            COUNT(DISTINCT customer_id) as distinct_customer_count,
-            GROUP_CONCAT(total_amount) as ticket_values
-        FROM
-            orders
-        {where_clause}
-        GROUP BY
-            period
-        ORDER BY
-            period ASC;
+            p.period,
+            COUNT(DISTINCT p.order_id) as order_count,
+            SUM(p.total_amount) as total_revenue,
+            COUNT(DISTINCT p.customer_id) as distinct_customer_count,
+            COUNT(DISTINCT CASE WHEN p.period = p.first_period THEN p.customer_id ELSE NULL END) as new_customer_count,
+            COUNT(DISTINCT CASE WHEN p.period != p.first_period THEN p.customer_id ELSE NULL END) as returning_customer_count,
+            GROUP_CONCAT(p.total_amount) as ticket_values,
+            GROUP_CONCAT(ad.customer_total) as revenue_per_customer_values
+        FROM PeriodData p
+        LEFT JOIN AggregatedData ad ON p.period = ad.period AND p.customer_id = ad.customer_id
+        GROUP BY p.period
+        ORDER BY p.period ASC;
     """
 
     conn = get_db_connection()
     report_data = conn.execute(query, params).fetchall()
     conn.close()
 
-    return jsonify([dict(row) for row in report_data])
+    # Processamento para evitar duplicatas em agregações de strings
+    processed_data = []
+    for row_dict in [dict(row) for row in report_data]:
+        if row_dict.get('revenue_per_customer_values'):
+            unique_revenues = set(row_dict['revenue_per_customer_values'].split(','))
+            row_dict['revenue_per_customer_values'] = ",".join(unique_revenues)
+        processed_data.append(row_dict)
+
+    return jsonify(processed_data)
 
 
 @app.route('/reports')

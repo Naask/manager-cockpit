@@ -20,8 +20,7 @@ def get_db_connection():
         print("Verifique se o caminho está correto e se o servidor do PDV já criou o arquivo .db.")
         raise e
 
-# --- ROTAS E ENDPOINTS DO COCKPIT OPERACIONAL (Sem alterações) ---
-
+# --- ROTAS DO COCKPIT OPERACIONAL (Sem alterações) ---
 @app.route('/api/cockpit/active-orders')
 def get_cockpit_data():
     conn = get_db_connection()
@@ -35,98 +34,98 @@ def get_cockpit_data():
 def cockpit_page():
     return render_template('cockpit.html')
 
-
-# --- ROTAS E ENDPOINTS DO COCKPIT DE GESTÃO ---
-
+# --- ROTAS DO COCKPIT DE GESTÃO (Sem alterações) ---
 @app.route('/api/gestao/financial-summary')
 def get_financial_summary():
-    """API que fornece dados financeiros, com filtro opcional por data e status 'CONCLUIDO'."""
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
     conn = get_db_connection()
-    
-    # --- Lógica de Filtro para Pedidos CONCLUÍDOS ---
     params = []
     where_clauses_completed = ["o.execution_status = 'CONCLUIDO'"]
     if start_date and end_date:
         where_clauses_completed.append("o.completed_at BETWEEN ? AND ?")
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-    
     final_where_clause_completed = f"WHERE {' AND '.join(where_clauses_completed)}"
-
-    completed_kpi_query = f"""
-        WITH FilteredOrders AS (
-            SELECT order_id, total_amount FROM orders o {final_where_clause_completed}
-        )
-        SELECT
-            (SELECT COUNT(order_id) FROM FilteredOrders) as orders_count,
-            (SELECT SUM(total_amount) FROM FilteredOrders) as gross_revenue,
-            (SELECT SUM(p.amount) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as total_received,
-            (SELECT COUNT(DISTINCT p.order_id) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as paid_orders_count;
-    """
+    completed_kpi_query = f"WITH FilteredOrders AS (SELECT order_id, total_amount FROM orders o {final_where_clause_completed}) SELECT (SELECT COUNT(order_id) FROM FilteredOrders) as orders_count, (SELECT SUM(total_amount) FROM FilteredOrders) as gross_revenue, (SELECT SUM(p.amount) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as total_received, (SELECT COUNT(DISTINCT p.order_id) FROM order_payments p JOIN FilteredOrders fo ON p.order_id = fo.order_id) as paid_orders_count;"
     completed_kpis = conn.execute(completed_kpi_query, params).fetchone()
-
-    # Query para Pedidos Pendentes - CORREÇÕES APLICADAS
     pending_where_clause = f"{final_where_clause_completed} AND o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')"
-    pending_orders_query = f"""
-        SELECT
-            o.order_id, c.name as customer_name, o.total_amount, o.payment_status, o.completed_at,
-            COALESCE(p.total_paid, 0) as total_paid,
-            (o.total_amount - COALESCE(p.total_paid, 0)) as remaining_balance
-        FROM orders o
-        JOIN customers c ON o.customer_id = c.customer_id
-        LEFT JOIN (
-            SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id
-        ) p ON o.order_id = p.order_id
-        {pending_where_clause}
-        ORDER BY o.completed_at DESC;
-    """
+    pending_orders_query = f"SELECT o.order_id, c.name as customer_name, o.total_amount, o.payment_status, o.completed_at, COALESCE(p.total_paid, 0) as total_paid, (o.total_amount - COALESCE(p.total_paid, 0)) as remaining_balance FROM orders o JOIN customers c ON o.customer_id = c.customer_id LEFT JOIN (SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id) p ON o.order_id = p.order_id {pending_where_clause} ORDER BY o.completed_at DESC;"
     pending_orders = conn.execute(pending_orders_query, params).fetchall()
-    
     all_completed_query = f"SELECT o.order_id, c.name as customer_name, o.completed_at, o.total_amount FROM orders o JOIN customers c ON o.customer_id = c.customer_id {final_where_clause_completed} ORDER BY o.completed_at DESC;"
     all_completed_orders = conn.execute(all_completed_query, params).fetchall()
-
-    # Query para KPIs de Pedidos em ABERTO (não filtrável por data)
-    open_orders_kpis_query = """
-        WITH OpenOrders AS (
-            SELECT order_id, total_amount, payment_status FROM orders WHERE execution_status != 'CONCLUIDO'
-        )
-        SELECT
-            (SELECT COUNT(order_id) FROM OpenOrders) as total_open_count,
-            (SELECT SUM(total_amount) FROM OpenOrders) as total_open_value,
-            (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status = 'PAGO') as open_and_paid_count,
-            (SELECT SUM(total_amount) FROM OpenOrders WHERE payment_status = 'PAGO') as open_and_paid_value,
-            (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')) as open_and_unpaid_count,
-            (SELECT SUM(o.total_amount - COALESCE(p.total_paid, 0)) FROM OpenOrders o LEFT JOIN (SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id) p ON o.order_id = p.order_id WHERE o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')) as open_and_unpaid_value
-    """
+    open_orders_kpis_query = "WITH OpenOrders AS (SELECT order_id, total_amount, payment_status FROM orders WHERE execution_status != 'CONCLUIDO') SELECT (SELECT COUNT(order_id) FROM OpenOrders) as total_open_count, (SELECT SUM(total_amount) FROM OpenOrders) as total_open_value, (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status = 'PAGO') as open_and_paid_count, (SELECT SUM(total_amount) FROM OpenOrders WHERE payment_status = 'PAGO') as open_and_paid_value, (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')) as open_and_unpaid_count, (SELECT SUM(o.total_amount - COALESCE(p.total_paid, 0)) FROM OpenOrders o LEFT JOIN (SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id) p ON o.order_id = p.order_id WHERE o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE')) as open_and_unpaid_value"
     open_orders_kpis = conn.execute(open_orders_kpis_query).fetchone()
-
-    # Query para a lista de todos os pedidos em andamento
-    in_progress_orders_query = """
-        SELECT
-            o.order_id, c.name as customer_name, o.execution_status,
-            o.pickup_datetime, o.payment_status, o.total_amount
-        FROM orders o JOIN customers c ON o.customer_id = c.customer_id
-        WHERE o.execution_status != 'CONCLUIDO'
-        ORDER BY o.pickup_datetime ASC, o.created_at ASC;
-    """
+    in_progress_orders_query = "SELECT o.order_id, c.name as customer_name, o.execution_status, o.pickup_datetime, o.payment_status, o.total_amount FROM orders o JOIN customers c ON o.customer_id = c.customer_id WHERE o.execution_status != 'CONCLUIDO' ORDER BY o.pickup_datetime ASC, o.created_at ASC;"
     in_progress_orders = conn.execute(in_progress_orders_query).fetchall()
-
     conn.close()
-
-    return jsonify({
-        'completed_kpis': dict(completed_kpis) if completed_kpis else {},
-        'pending_orders': [dict(row) for row in pending_orders],
-        'all_completed_orders': [dict(row) for row in all_completed_orders],
-        'open_orders_kpis': dict(open_orders_kpis) if open_orders_kpis else {},
-        'in_progress_orders': [dict(row) for row in in_progress_orders]
-    })
+    return jsonify({'completed_kpis': dict(completed_kpis) if completed_kpis else {}, 'pending_orders': [dict(row) for row in pending_orders], 'all_completed_orders': [dict(row) for row in all_completed_orders], 'open_orders_kpis': dict(open_orders_kpis) if open_orders_kpis else {}, 'in_progress_orders': [dict(row) for row in in_progress_orders]})
 
 @app.route('/gestao')
 def gestao_page():
     return render_template('gestao.html')
 
 
+# --- ROTAS PARA O PAINEL DE RELATÓRIOS GERENCIAIS ---
+
+@app.route('/api/reports/summary')
+def get_reports_summary():
+    """
+    API que retorna dados agregados para os gráficos gerenciais,
+    com agrupamento dinâmico e filtro de data.
+    """
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # Mapeia o parâmetro da URL para o formato do strftime do SQLite
+    period_formats = {
+        # CORREÇÃO: Usando strftime para formatar o ano e o número da semana corretamente.
+        'week': "strftime('%Y-W%W', created_at)",
+        'month': "strftime('%Y-%m', created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', created_at)"
+    }
+    
+    period_format = period_formats.get(period, period_formats['month'])
+
+    # Constrói a cláusula WHERE para o filtro de datas
+    params = []
+    where_clause = ""
+    if start_date and end_date:
+        where_clause = "WHERE created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    query = f"""
+        SELECT
+            {period_format} as period,
+            COUNT(order_id) as order_count,
+            SUM(total_amount) as total_revenue,
+            COUNT(DISTINCT customer_id) as distinct_customer_count,
+            GROUP_CONCAT(total_amount) as ticket_values
+        FROM
+            orders
+        {where_clause}
+        GROUP BY
+            period
+        ORDER BY
+            period ASC;
+    """
+
+    conn = get_db_connection()
+    report_data = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in report_data])
+
+
+@app.route('/reports')
+def reports_page():
+    """Renderiza a página HTML dos relatórios gerenciais."""
+    return render_template('management_reports.html')
+
+
+# --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':
     app.run(port=3001, debug=True)

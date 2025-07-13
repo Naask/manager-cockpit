@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatórios Gerenciais - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #28a745; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+        .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls-container label { font-weight: bold; }
+        .controls-container input, .controls-container select { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #filter-button { background-color: #007bff; }
+        #clear-filter-button { background-color: #6c757d; }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 2rem; }
+        .chart-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 0; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+</head>
+<body>
+    <header><h1>Relatórios Gerenciais</h1></header>
+    <main>
+        <div class="controls-container">
+            <label for="period-selector">Agrupar por:</label>
+            <select id="period-selector">
+                <option value="month">Mês</option>
+                <option value="week">Semana</option>
+                <option value="bimester">Bimestre</option>
+                <option value="trimester">Trimestre</option>
+                <option value="semester">Semestre</option>
+                <option value="year">Ano</option>
+            </select>
+            <label for="start-date">De:</label>
+            <input type="date" id="start-date">
+            <label for="end-date">Até:</label>
+            <input type="date" id="end-date">
+            <button id="filter-button">Filtrar</button>
+            <button id="clear-filter-button">Limpar</button>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Pedidos por Período</h2>
+                <canvas id="ordersCountChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Faturamento por Período</h2>
+                <canvas id="revenueChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Clientes Distintos por Período</h2>
+                <canvas id="customersCountChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Ticket Médio e Mediano por Período</h2>
+                <canvas id="ticketChart"></canvas>
+            </div>
+        </div>
+    </main>
+    <script src="/static/management_reports.js"></script>
+</body>
+</html>

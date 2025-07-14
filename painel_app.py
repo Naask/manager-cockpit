@@ -148,6 +148,69 @@ def reports_page():
     """Renderiza a página HTML dos relatórios gerenciais."""
     return render_template('management_reports.html')
 
+# --- ROTAS PARA A ANÁLISE DE COORTES (ATUALIZADO) ---
+
+@app.route('/api/reports/cohort-retention')
+def get_cohort_retention_data():
+    """
+    API que retorna os dados brutos para a análise de retenção de coortes,
+    com filtros de período e granularidade.
+    """
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    period_formats = {
+        'month': "strftime('%Y-%m', created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', created_at)"
+    }
+    period_format = period_formats.get(period, period_formats['month'])
+    
+    params = []
+    where_clause = ""
+    if start_date and end_date:
+        where_clause = "WHERE created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+    
+    query = f"""
+        WITH CustomerFirstOrder AS (
+            SELECT
+                customer_id,
+                strftime({period_format.replace('created_at', 'MIN(created_at)')}) as cohort_period
+            FROM orders
+            GROUP BY customer_id
+        ),
+        OrderActivity AS (
+            SELECT
+                o.customer_id,
+                cfo.cohort_period,
+                strftime({period_format}) as activity_period
+            FROM orders o
+            JOIN CustomerFirstOrder cfo ON o.customer_id = cfo.customer_id
+            {where_clause}
+        )
+        SELECT
+            cohort_period,
+            activity_period,
+            COUNT(DISTINCT customer_id) as active_customers
+        FROM OrderActivity
+        GROUP BY cohort_period, activity_period
+        ORDER BY cohort_period, activity_period;
+    """
+    conn = get_db_connection()
+    cohort_data = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in cohort_data])
+
+@app.route('/cohorts')
+def cohorts_page():
+    """Renderiza a página HTML da análise de coortes."""
+    return render_template('cohorts.html')
+
 
 # --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':

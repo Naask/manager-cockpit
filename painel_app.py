@@ -212,6 +212,66 @@ def cohorts_page():
     return render_template('cohorts.html')
 
 
+# --- ROTAS PARA A ANÁLISE DE PERFORMANCE DE PRODUTOS (CORRIGIDO) ---
+
+@app.route('/api/reports/product-performance') # Rota da API padronizada
+def get_product_performance_data():
+    """
+    API que retorna dados de performance de produtos (frequência e receita)
+    agrupados por período e com filtro de data.
+    """
+    # ... (o conteúdo desta função permanece o mesmo)
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    period_formats = {
+        'week': "strftime('%Y-W%W', o.created_at)",
+        'month': "strftime('%Y-%m', o.created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', o.created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', o.created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', o.created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', o.created_at)"
+    }
+    period_format = period_formats.get(period, period_formats['month'])
+
+    params = []
+    where_clause = ""
+    if start_date and end_date:
+        where_clause = "WHERE o.created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    query = f"""
+        SELECT
+            p.name as product_name,
+            p.category as product_category,
+            SUM(oi.quantity) as total_quantity,
+            SUM(oi.total_price) as total_revenue
+        FROM
+            order_items oi
+        JOIN
+            products p ON oi.product_id = p.product_id
+        JOIN
+            orders o ON oi.order_id = o.order_id
+        {where_clause}
+        GROUP BY
+            p.product_id, p.name, p.category
+        ORDER BY
+            total_revenue DESC;
+    """
+
+    conn = get_db_connection()
+    product_data = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in product_data])
+
+
+@app.route('/products_report') # Rota da página padronizada
+def product_reports_page():
+    """Renderiza a página HTML da análise de produtos."""
+    return render_template('products_report.html') # Nome do template padronizado
+
 # --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':
     app.run(port=3001, debug=True)

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise de Produtos - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #17a2b8; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+        .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls-container label { font-weight: bold; }
+        .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #filter-button { background-color: #007bff; }
+        #clear-filter-button { background-color: #6c757d; }
+        .reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .report-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <header><h1>Análise de Performance de Produtos</h1></header>
+    <main>
+        <div class="controls-container">
+            <label for="start-date">De:</label>
+            <input type="date" id="start-date">
+            <label for="end-date">Até:</label>
+            <input type="date" id="end-date">
+            <button id="filter-button">Analisar Período</button>
+            <button id="clear-filter-button">Limpar Filtro</button>
+        </div>
+
+        <div class="reports-grid">
+            <div class="report-container">
+                <h2>Top Produtos por Receita</h2>
+                <table id="revenue-table">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Categoria</th>
+                            <th>Receita Gerada</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="report-container">
+                <h2>Top Produtos por Frequência</h2>
+                <table id="quantity-table">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Categoria</th>
+                            <th>Unidades Vendidas</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <script src="/static/products_report.js"></script>
+</body>
+</html>

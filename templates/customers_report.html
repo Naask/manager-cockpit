@@ -5,7 +5,7 @@
     <title>Análise de Clientes - Lavanderia</title>
     <style>
         body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
-        header { background-color: #ffc107; color: #212529; padding: 1rem; text-align: center; }
+        header { background-color: #007bff; color: white; padding: 1rem; text-align: center; }
         main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
         .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .controls-container label { font-weight: bold; }
@@ -43,10 +43,16 @@
         </div>
 
         <div class="report-container">
+            <h2>Análise de Concentração de Faturamento (ABC)</h2>
+            <canvas id="concentration-chart"></canvas>
+        </div>
+
+        <div class="report-container">
             <h2>Ranking de Clientes por Receita</h2>
             <table id="customers-table">
                 <thead>
                     <tr>
+                        <th>Pos.</th>
                         <th>Cliente</th>
                         <th>Receita Total</th>
                         <th>% do Total</th>
@@ -57,11 +63,6 @@
                 </thead>
                 <tbody></tbody>
             </table>
-        </div>
-
-        <div class="report-container">
-            <h2>Análise de Concentração de Faturamento (ABC)</h2>
-            <canvas id="concentration-chart"></canvas>
         </div>
     </main>
     <script src="/static/customers_report.js"></script>

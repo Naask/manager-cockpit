@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAndRenderReports(startDate, endDate, period) {
-        // --- Renderiza a Tabela de Ranking (lógica existente, mas agora com API separada) ---
-        customersTableBody.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+        // --- Renderiza a Tabela de Ranking ---
+        customersTableBody.innerHTML = '<tr><td colspan="7">Carregando...</td></tr>';
         try {
             let rankingUrl = '/api/reports/customer-performance';
             if (startDate && endDate) {
@@ -30,24 +30,33 @@ document.addEventListener('DOMContentLoaded', () => {
             
             customersTableBody.innerHTML = '';
             if (rankingData.customers.length === 0) {
-                customersTableBody.innerHTML = '<tr><td colspan="6">Nenhum dado encontrado para o período.</td></tr>';
+                customersTableBody.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado para o período.</td></tr>';
             } else {
                 let cumulativeRevenue = 0;
-                rankingData.customers.forEach(customer => {
+                // Adiciona um contador (index) para a posição no ranking
+                rankingData.customers.forEach((customer, index) => {
                     const row = customersTableBody.insertRow();
                     const percentageOfTotal = rankingData.grand_total_revenue > 0 ? (customer.total_revenue / rankingData.grand_total_revenue) * 100 : 0;
                     cumulativeRevenue += customer.total_revenue;
                     const paretoPercentage = rankingData.grand_total_revenue > 0 ? (cumulativeRevenue / rankingData.grand_total_revenue) * 100 : 0;
                     const averageTicket = customer.order_count > 0 ? (customer.total_revenue / customer.order_count) : 0;
-                    row.innerHTML = `<td>${customer.customer_name}</td><td><strong>${formatCurrency(customer.total_revenue)}</strong></td><td>${percentageOfTotal.toFixed(2)}%</td><td>${paretoPercentage.toFixed(2)}%</td><td>${customer.order_count}</td><td>${formatCurrency(averageTicket)}</td>`;
+                    row.innerHTML = `
+                        <td><strong>${index + 1}º</strong></td>
+                        <td>${customer.customer_name}</td>
+                        <td>${formatCurrency(customer.total_revenue)}</td>
+                        <td>${percentageOfTotal.toFixed(2)}%</td>
+                        <td>${paretoPercentage.toFixed(2)}%</td>
+                        <td>${customer.order_count}</td>
+                        <td>${formatCurrency(averageTicket)}</td>
+                    `;
                 });
             }
         } catch (error) {
             console.error("Erro ao carregar dados de ranking de clientes:", error);
-            customersTableBody.innerHTML = '<tr><td colspan="6">Erro ao carregar dados.</td></tr>';
+            customersTableBody.innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
         }
 
-        // --- Renderiza o Gráfico de Concentração ABC (NOVA LÓGICA) ---
+        // --- Renderiza o Gráfico de Concentração ABC ---
         try {
             let trendUrl = `/api/reports/customer-concentration-trend?period=${period}`;
             if (startDate && endDate) {
@@ -58,8 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const trendData = await trendResponse.json();
 
             const labels = trendData.map(d => d.period);
-            const clientsA = []; // Clientes que somam 50% do faturamento
-            const clientsB = []; // Clientes que somam os próximos 30% (até 80%)
+            const clientsA = []; 
+            const clientsB = []; 
 
             trendData.forEach(periodData => {
                 const revenues = periodData.customer_revenues.sort((a, b) => b - a);
@@ -85,22 +94,43 @@ document.addEventListener('DOMContentLoaded', () => {
             if (concentrationChart) {
                 concentrationChart.destroy();
             }
+            
             concentrationChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Qtd. Clientes (Top 50% Faturamento)', data: clientsA, backgroundColor: '#20c997' }, // Verde
-                        { label: 'Qtd. Clientes (Próximos 30% Faturamento)', data: clientsB, backgroundColor: '#ffc107' } // Amarelo
+                        {
+                            label: 'Qtd. Clientes (Top 50% Faturamento)',
+                            data: clientsA,
+                            backgroundColor: '#007bff'
+                        },
+                        {
+                            label: 'Qtd. Clientes (Próximos 30% Faturamento)',
+                            data: clientsB,
+                            backgroundColor: '#a4c1f4'
+                        }
                     ]
                 },
                 options: {
                     plugins: {
-                        datalabels: { color: '#fff', font: { weight: 'bold' } },
+                        // Configuração simplificada para os rótulos internos
+                        datalabels: {
+                            display: (context) => context.dataset.data[context.dataIndex] > 0, // Mostra apenas se > 0
+                            color: (context) => context.dataset.backgroundColor === '#007bff' ? '#ffffff' : '#000000',
+                            anchor: 'center',
+                            align: 'center',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
                         title: { display: true, text: 'Nº de Clientes Responsáveis por 80% do Faturamento' }
                     },
                     responsive: true,
-                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    scales: {
+                        x: { stacked: true }, 
+                        y: { stacked: true, beginAtZero: true }
+                    }
                 }
             });
 

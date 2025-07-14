@@ -213,27 +213,16 @@ def cohorts_page():
 
 
 # --- ROTAS PARA A ANÁLISE DE PERFORMANCE DE PRODUTOS (CORRIGIDO) ---
+# Substitua esta função no seu painel_app.py
 
-@app.route('/api/reports/product-performance') # Rota da API padronizada
+@app.route('/api/reports/products-performance')
 def get_product_performance_data():
     """
-    API que retorna dados de performance de produtos (frequência e receita)
-    agrupados por período e com filtro de data.
+    API que retorna dados de performance de produtos, incluindo contagem de clientes
+    distintos por item e totais gerais para cálculo de Pareto.
     """
-    # ... (o conteúdo desta função permanece o mesmo)
-    period = request.args.get('period', 'month')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
-    period_formats = {
-        'week': "strftime('%Y-W%W', o.created_at)",
-        'month': "strftime('%Y-%m', o.created_at)",
-        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', o.created_at) - 1) / 2 + 1)",
-        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', o.created_at) - 1) / 3 + 1)",
-        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', o.created_at) - 1) / 6 + 1)",
-        'year': "strftime('%Y', o.created_at)"
-    }
-    period_format = period_formats.get(period, period_formats['month'])
 
     params = []
     where_clause = ""
@@ -241,12 +230,15 @@ def get_product_performance_data():
         where_clause = "WHERE o.created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
 
+    # Query principal atualizada para incluir a contagem de clientes distintos por produto
     query = f"""
         SELECT
             p.name as product_name,
             p.category as product_category,
             SUM(oi.quantity) as total_quantity,
-            SUM(oi.total_price) as total_revenue
+            SUM(oi.total_price) as total_revenue,
+            COUNT(DISTINCT o.order_id) as order_appearence_count,
+            COUNT(DISTINCT o.customer_id) as distinct_customer_count
         FROM
             order_items oi
         JOIN
@@ -262,15 +254,30 @@ def get_product_performance_data():
 
     conn = get_db_connection()
     product_data = conn.execute(query, params).fetchall()
+
+    # Queries para os totais gerais do período
+    total_revenue_query = f"SELECT SUM(oi.total_price) as grand_total FROM order_items oi JOIN orders o ON oi.order_id = o.order_id {where_clause};"
+    total_orders_query = f"SELECT COUNT(DISTINCT order_id) as grand_total FROM orders o {where_clause};"
+    total_customers_query = f"SELECT COUNT(DISTINCT customer_id) as grand_total FROM orders o {where_clause};"
+    
+    grand_total_revenue = (conn.execute(total_revenue_query, params).fetchone() or {'grand_total': 0})['grand_total']
+    grand_total_orders = (conn.execute(total_orders_query, params).fetchone() or {'grand_total': 0})['grand_total']
+    grand_total_customers = (conn.execute(total_customers_query, params).fetchone() or {'grand_total': 0})['grand_total']
+    
     conn.close()
 
-    return jsonify([dict(row) for row in product_data])
-
+    return jsonify({
+        'products': [dict(row) for row in product_data],
+        'grand_total_revenue': grand_total_revenue or 0,
+        'grand_total_orders': grand_total_orders or 0,
+        'grand_total_customers': grand_total_customers or 0
+    })
 
 @app.route('/products_report') # Rota da página padronizada
 def product_reports_page():
     """Renderiza a página HTML da análise de produtos."""
     return render_template('products_report.html') # Nome do template padronizado
+
 
 # --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':

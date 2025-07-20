@@ -223,6 +223,41 @@ def get_cohort_retention_data():
 def cohorts_page():
     return render_template('cohorts.html')
 
+# Adicione este trecho ao seu painel_app.py
+
+# --- ROTA PARA DADOS DO HISTOGRAMA (NOVO) ---
+
+@app.route('/api/reports/order-values')
+def get_order_values_data():
+    """
+    API que retorna uma lista de todos os valores de pedidos para
+    a construção do histograma, com filtro de data.
+    """
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    params = []
+    where_clause = ""
+    if start_date and end_date:
+        where_clause = "WHERE created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    # Query que busca apenas os valores totais dos pedidos
+    query = f"""
+        SELECT
+            total_amount
+        FROM
+            orders
+        {where_clause};
+    """
+
+    conn = get_db_connection()
+    order_values = conn.execute(query, params).fetchall()
+    conn.close()
+
+    # Retorna uma lista simples de números (valores em centavos)
+    return jsonify([row['total_amount'] for row in order_values])
+
 
 # --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':

@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBarChart(chartKey, canvasId, labels, label, data, color) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         if (charts[chartKey]) charts[chartKey].destroy();
+        
         charts[chartKey] = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -112,11 +113,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     datalabels: {
                         anchor: 'end', align: 'end',
-                        formatter: (value) => (label.includes('R$') ? value.toFixed(2) : value),
+                        // Lógica de formatação atualizada
+                        formatter: (value) => {
+                            if (label.includes('Faturamento')) {
+                                // Remove os centavos e adiciona ponto como separador de milhar
+                                return Math.round(value).toLocaleString('pt-BR');
+                            }
+                            // Mantém o formato padrão para os outros gráficos
+                            return value;
+                        },
                         color: '#555'
                     }
                 },
-                scales: { y: { beginAtZero: true } }
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        // Adiciona formatação ao eixo Y do gráfico de faturamento
+                        ticks: {
+                            callback: function(value) {
+                                if (label.includes('Faturamento')) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                                return value;
+                            }
+                        }
+                    } 
+                }
             }
         });
     }

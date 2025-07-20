@@ -71,10 +71,10 @@ def gestao_page():
 # --- ROTAS DE RELATÓRIOS GERENCIAIS (GRÁFICOS) ---
 @app.route('/api/reports/summary')
 def get_reports_summary():
-    # ... (código existente, sem alterações) ...
     period = request.args.get('period', 'month')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    
     period_formats = {
         'daily': "strftime('%Y-%m-%d', created_at)",
         'week': "strftime('%Y-W%W', created_at)",
@@ -82,23 +82,80 @@ def get_reports_summary():
         'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
         'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
         'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
-        'year': "strftime('%Y', created_at)"}
+        'year': "strftime('%Y', created_at)"
+    }
     period_format = period_formats.get(period, period_formats['month'])
+    
     params = []
     where_clause = ""
     if start_date and end_date:
         where_clause = "WHERE created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-    query = f"WITH PeriodData AS (SELECT {period_format} as period, customer_id, order_id, total_amount, (SELECT strftime({period_formats['month'].replace('created_at', 'MIN(o2.created_at)')}) FROM orders o2 WHERE o2.customer_id = o.customer_id) as first_period FROM orders o {where_clause}), AggregatedData AS (SELECT period, customer_id, SUM(total_amount) as customer_total FROM PeriodData GROUP BY period, customer_id) SELECT p.period, COUNT(DISTINCT p.order_id) as order_count, SUM(p.total_amount) as total_revenue, COUNT(DISTINCT p.customer_id) as distinct_customer_count, COUNT(DISTINCT CASE WHEN p.period = p.first_period THEN p.customer_id ELSE NULL END) as new_customer_count, COUNT(DISTINCT CASE WHEN p.period != p.first_period THEN p.customer_id ELSE NULL END) as returning_customer_count, GROUP_CONCAT(p.total_amount) as ticket_values, GROUP_CONCAT(ad.customer_total) as revenue_per_customer_values FROM PeriodData p LEFT JOIN AggregatedData ad ON p.period = ad.period AND p.customer_id = ad.customer_id GROUP BY p.period ORDER BY p.period ASC;"
+        
+    # CORREÇÃO APLICADA AQUI
+    query = f"""
+        WITH CustomerFirstPeriod AS (
+            -- 1. Calcula o período de aquisição de cada cliente
+            SELECT
+                customer_id,
+                {period_format.replace('created_at', 'MIN(created_at)')} as first_period
+            FROM orders
+            GROUP BY customer_id
+        ),
+        PeriodData AS (
+            -- 2. Junta os dados de cada pedido com o período de aquisição do seu cliente
+            SELECT
+                {period_format} as period,
+                o.customer_id,
+                o.order_id,
+                o.total_amount,
+                cfp.first_period
+            FROM orders o
+            JOIN CustomerFirstPeriod cfp ON o.customer_id = cfp.customer_id
+            {where_clause}
+        )
+        -- 3. Agrega os resultados finais, comparando o período do pedido com o período de aquisição
+        SELECT
+            period,
+            COUNT(DISTINCT order_id) as order_count,
+            SUM(total_amount) as total_revenue,
+            COUNT(DISTINCT customer_id) as distinct_customer_count,
+            COUNT(DISTINCT CASE WHEN period = first_period THEN customer_id ELSE NULL END) as new_customer_count,
+            COUNT(DISTINCT CASE WHEN period != first_period THEN customer_id ELSE NULL END) as returning_customer_count,
+            GROUP_CONCAT(total_amount) as ticket_values
+        FROM PeriodData
+        GROUP BY period
+        ORDER BY period ASC;
+    """
     conn = get_db_connection()
     report_data = conn.execute(query, params).fetchall()
     conn.close()
+    
+    # A query de faturamento por cliente agora precisa ser separada
     processed_data = []
-    for row_dict in [dict(row) for row in report_data]:
-        if row_dict.get('revenue_per_customer_values'):
-            unique_revenues = set(row_dict['revenue_per_customer_values'].split(','))
-            row_dict['revenue_per_customer_values'] = ",".join(unique_revenues)
+    for row in report_data:
+        row_dict = dict(row)
+        
+        # Adapta os parâmetros para a subquery
+        sub_params = list(params)
+        sub_params.append(row_dict['period'])
+
+        # Lógica para buscar faturamento por cliente para o período específico da linha
+        customer_revenue_query = f"""
+            SELECT SUM(total_amount) as customer_total
+            FROM orders
+            WHERE {period_format} = ?
+            {where_clause.replace('WHERE', 'AND') if where_clause else ''}
+            GROUP BY customer_id
+        """
+        
+        conn = get_db_connection()
+        customer_revenues = conn.execute(customer_revenue_query, sub_params).fetchall()
+        conn.close()
+        
+        row_dict['revenue_per_customer_values'] = ",".join([str(r['customer_total']) for r in customer_revenues])
         processed_data.append(row_dict)
+
     return jsonify(processed_data)
 
 @app.route('/reports')
@@ -134,10 +191,10 @@ def product_reports_page():
     return render_template('products_report.html')
 
 
-# --- ROTAS DE ANÁLISE DE CLIENTES (COM CORREÇÕES) ---
-
-@app.route('/api/reports/customer-performance') # ROTA RESTAURADA
+# --- ROTAS DE ANÁLISE DE CLIENTES ---
+@app.route('/api/reports/customer-performance')
 def get_customer_performance_data():
+    # ... (código existente, sem alterações) ...
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     params = []
@@ -152,53 +209,32 @@ def get_customer_performance_data():
     conn.close()
     return jsonify({'customers': [dict(row) for row in customer_data], 'grand_total_revenue': grand_total_revenue or 0})
 
-@app.route('/api/reports/customer-concentration-trend') # ROTA COM SQL CORRIGIDO
+@app.route('/api/reports/customer-concentration-trend')
 def get_customer_concentration_trend():
+    # ... (código existente, sem alterações) ...
     period = request.args.get('period', 'month')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    period_formats = {
-        'month': "strftime('%Y-%m', created_at)",
-        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
-        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
-        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
-        'year': "strftime('%Y', created_at)"
-    }
+    period_formats = {'month': "strftime('%Y-%m', created_at)",'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",'year': "strftime('%Y', created_at)"}
     period_format = period_formats.get(period, period_formats['month'])
     params = []
     where_clause = ""
     if start_date and end_date:
         where_clause = "WHERE created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-    
-    # Query corrigida, mais simples e robusta
-    query = f"""
-        SELECT
-            {period_format} as period,
-            customer_id,
-            SUM(total_amount) as revenue
-        FROM orders
-        {where_clause}
-        GROUP BY period, customer_id;
-    """
+    query = f"SELECT {period_format} as period, customer_id, SUM(total_amount) as revenue FROM orders {where_clause} GROUP BY period, customer_id;"
     conn = get_db_connection()
     customer_revenues_raw = conn.execute(query, params).fetchall()
     conn.close()
-    
     data_by_period = {}
     for row in customer_revenues_raw:
         period_key = row['period']
         if period_key not in data_by_period:
             data_by_period[period_key] = []
         data_by_period[period_key].append(row['revenue'])
-    
     response_data = []
     for period, revenues in sorted(data_by_period.items()):
-        response_data.append({
-            'period': period,
-            'total_revenue_in_period': sum(revenues),
-            'customer_revenues': revenues
-        })
+        response_data.append({'period': period, 'total_revenue_in_period': sum(revenues), 'customer_revenues': revenues})
     return jsonify(response_data)
 
 @app.route('/customers_report')
@@ -230,39 +266,22 @@ def get_cohort_retention_data():
 def cohorts_page():
     return render_template('cohorts.html')
 
-# Adicione este trecho ao seu painel_app.py
 
-# --- ROTA PARA DADOS DO HISTOGRAMA (NOVO) ---
-
+# --- ROTA PARA DADOS DO HISTOGRAMA ---
 @app.route('/api/reports/order-values')
 def get_order_values_data():
-    """
-    API que retorna uma lista de todos os valores de pedidos para
-    a construção do histograma, com filtro de data.
-    """
+    # ... (código existente, sem alterações) ...
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
     params = []
     where_clause = ""
     if start_date and end_date:
         where_clause = "WHERE created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-
-    # Query que busca apenas os valores totais dos pedidos
-    query = f"""
-        SELECT
-            total_amount
-        FROM
-            orders
-        {where_clause};
-    """
-
+    query = f"SELECT total_amount FROM orders {where_clause};"
     conn = get_db_connection()
     order_values = conn.execute(query, params).fetchall()
     conn.close()
-
-    # Retorna uma lista simples de números (valores em centavos)
     return jsonify([row['total_amount'] for row in order_values])
 
 

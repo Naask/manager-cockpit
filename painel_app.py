@@ -75,7 +75,14 @@ def get_reports_summary():
     period = request.args.get('period', 'month')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    period_formats = {'week': "strftime('%Y-W%W', created_at)",'month': "strftime('%Y-%m', created_at)",'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",'year': "strftime('%Y', created_at)"}
+    period_formats = {
+        'daily': "strftime('%Y-%m-%d', created_at)",
+        'week': "strftime('%Y-W%W', created_at)",
+        'month': "strftime('%Y-%m', created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', created_at)"}
     period_format = period_formats.get(period, period_formats['month'])
     params = []
     where_clause = ""

@@ -7,10 +7,10 @@
         body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
         header { background-color: #007bff; color: white; padding: 1rem; text-align: center; }
         main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
-        .filter-container { display: flex; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .filter-container label { font-weight: bold; }
-        .filter-container input[type="date"] { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; }
-        .filter-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls-container label { font-weight: bold; }
+        .controls-container select, .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
         #filter-button { background-color: #007bff; }
         #clear-filter-button { background-color: #6c757d; }
         .kpi-container { display: flex; justify-content: space-around; gap: 1rem; margin-bottom: 1rem; }
@@ -18,21 +18,26 @@
         .kpi-title { font-size: 1rem; color: #6c757d; margin-bottom: 0.5rem; }
         .kpi-value { font-size: 2rem; font-weight: bold; color: #343a40; }
         .kpi-value.pending { color: #dc3545; }
-        .content-section { background-color: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 2rem; }
-        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
+        .report-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 2rem; }
+        h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 0; }
         h2 span, .kpi-title span { font-weight: normal; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
+        tfoot td { font-weight: bold; background-color: #f8f9fa; }
     </style>
 </head>
 <body>
     <header><h1>Cockpit de Gestão Financeira</h1></header>
     <main>
-        <div class="filter-container">
-            <label for="start-date">Data de Conclusão (Início):</label>
+        <div class="controls-container">
+            <label for="start-date">De:</label>
             <input type="date" id="start-date">
-            <label for="end-date">Fim:</label>
+            <label for="end-date">Até:</label>
             <input type="date" id="end-date">
+            <label for="customer-filter">Cliente:</label>
+            <select id="customer-filter">
+                <option value="">Todos os Clientes</option>
+                </select>
             <button id="filter-button">Filtrar</button>
             <button id="clear-filter-button">Limpar</button>
         </div>
@@ -49,11 +54,12 @@
             <div class="kpi-card"><div class="kpi-title">Abertos e Pagos <span>(<span id="kpi-open-paid-count">0</span> pedidos)</span></div><div class="kpi-value" id="kpi-open-paid-value">R$ 0,00</div></div>
         </section>
 
-        <section class="content-section">
+        <section class="report-container">
             <h2>Pedidos Concluídos com Saldo Devedor <span>(<span id="pending-orders-count2">0</span>)</span></h2>
             <table id="pending-orders-table">
                 <thead>
                     <tr>
+                        <th>Data Criação</th>
                         <th>Concluído em</th>
                         <th>Pedido #</th>
                         <th>Cliente</th>
@@ -64,21 +70,52 @@
                     </tr>
                 </thead>
                 <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="5">TOTAIS</td>
+                        <td id="pending-total-amount">R$ 0,00</td>
+                        <td id="pending-total-paid">R$ 0,00</td>
+                        <td id="pending-remaining-balance">R$ 0,00</td>
+                    </tr>
+                </tfoot>
             </table>
         </section>
 
-        <section class="content-section">
+        <section class="report-container">
             <h2>Todos os Pedidos Concluídos <span>(<span id="all-completed-orders-count">0</span>)</span></h2>
             <table id="all-completed-orders-table">
-                <thead><tr><th>Concluído em</th><th>Pedido #</th><th>Cliente</th><th>Valor Total</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Data Criação</th>
+                        <th>Concluído em</th>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                        <th>Valor Total</th>
+                    </tr>
+                </thead>
                 <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4">TOTAL</td>
+                        <td id="completed-total-amount">R$ 0,00</td>
+                    </tr>
+                </tfoot>
             </table>
         </section>
         
-        <section class="content-section">
+        <section class="report-container">
             <h2>Todos os Pedidos em Andamento <span>(<span id="in-progress-orders-count">0</span>)</span></h2>
             <table id="in-progress-orders-table">
-                <thead><tr><th>Pedido #</th><th>Cliente</th><th>Status Atual</th><th>Prazo de Entrega</th><th>Status Pagamento</th><th>Valor do Pedido</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Pedido #</th>
+                        <th>Cliente</th>
+                        <th>Status Atual</th>
+                        <th>Prazo de Entrega</th>
+                        <th>Status Pagamento</th>
+                        <th>Valor do Pedido</th>
+                    </tr>
+                </thead>
                 <tbody></tbody>
             </table>
         </section>

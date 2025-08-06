@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearButton = document.getElementById('clear-filter-button');
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
+    const customerFilter = document.getElementById('customer-filter');
 
     function formatCurrency(amountInCents) {
         if (amountInCents === null || amountInCents === undefined) return 'R$ 0,00';
@@ -18,12 +19,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function fetchFinancialData(startDate, endDate) {
+    async function populateCustomerFilter() {
+        try {
+            const response = await fetch('/api/customers');
+            if (!response.ok) throw new Error('Falha ao buscar clientes');
+            const customers = await response.json();
+            
+            customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer.customer_id;
+                option.textContent = customer.name;
+                customerFilter.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Erro ao popular filtro de clientes:", error);
+        }
+    }
+
+    async function fetchFinancialData(startDate, endDate, customerId) {
         try {
             let url = '/api/gestao/financial-summary';
+            const params = new URLSearchParams();
             if (startDate && endDate) {
-                url += `?start_date=${startDate}&end_date=${endDate}`;
+                params.append('start_date', startDate);
+                params.append('end_date', endDate);
             }
+            if (customerId) {
+                params.append('customer_id', customerId);
+            }
+            url += `?${params.toString()}`;
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -52,14 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('kpi-open-paid-count').textContent = openKpis.open_and_paid_count || 0;
             document.getElementById('kpi-open-paid-value').textContent = formatCurrency(openKpis.open_and_paid_value);
 
-            // 3. Preenche a tabela de Pedidos Pendentes (CORRIGIDO)
+            // 3. Preenche a tabela de Pedidos Pendentes com totalizadores
             const pendingTableBody = document.querySelector('#pending-orders-table tbody');
             pendingTableBody.innerHTML = '';
             document.getElementById('pending-orders-count2').textContent = data.pending_orders.length;
+            let pendingTotalAmount = 0;
+            let pendingTotalPaid = 0;
+            let pendingRemainingBalance = 0;
             data.pending_orders.forEach(order => {
                 const row = pendingTableBody.insertRow();
                 const status = order.payment_status.replace('_', ' ');
                 row.innerHTML = `
+                    <td>${formatDate(order.created_at)}</td>
                     <td>${formatDate(order.completed_at)}</td>
                     <td>${order.order_id}</td>
                     <td>${order.customer_name}</td>
@@ -68,16 +96,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${formatCurrency(order.total_paid)}</td>
                     <td><strong>${formatCurrency(order.remaining_balance)}</strong></td>
                 `;
+                pendingTotalAmount += order.total_amount;
+                pendingTotalPaid += order.total_paid;
+                pendingRemainingBalance += order.remaining_balance;
             });
+            document.getElementById('pending-total-amount').textContent = formatCurrency(pendingTotalAmount);
+            document.getElementById('pending-total-paid').textContent = formatCurrency(pendingTotalPaid);
+            document.getElementById('pending-remaining-balance').textContent = formatCurrency(pendingRemainingBalance);
 
-            // 4. Preenche a tabela de Todos os Pedidos Concluídos
+            // 4. Preenche a tabela de Todos os Pedidos Concluídos com totalizadores
             const completedTableBody = document.querySelector('#all-completed-orders-table tbody');
             completedTableBody.innerHTML = '';
             document.getElementById('all-completed-orders-count').textContent = data.all_completed_orders.length;
+            let completedTotalAmount = 0;
             data.all_completed_orders.forEach(order => {
                 const row = completedTableBody.insertRow();
-                row.innerHTML = `<td>${formatDate(order.completed_at)}</td><td>${order.order_id}</td><td>${order.customer_name}</td><td>${formatCurrency(order.total_amount)}</td>`;
+                row.innerHTML = `
+                    <td>${formatDate(order.created_at)}</td>
+                    <td>${formatDate(order.completed_at)}</td>
+                    <td>${order.order_id}</td>
+                    <td>${order.customer_name}</td>
+                    <td>${formatCurrency(order.total_amount)}</td>
+                `;
+                completedTotalAmount += order.total_amount;
             });
+            document.getElementById('completed-total-amount').textContent = formatCurrency(completedTotalAmount);
 
             // 5. Preenche a tabela de Todos os Pedidos em Andamento
             const inProgressTableBody = document.querySelector('#in-progress-orders-table tbody');
@@ -96,17 +139,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    filterButton.addEventListener('click', () => {
+    function updateView() {
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
-        fetchFinancialData(startDate, endDate);
-    });
+        const customerId = customerFilter.value; // Pega o valor do novo filtro
+        fetchFinancialData(startDate, endDate, customerId);
+    }
+    
+    filterButton.addEventListener('click', updateView);
 
     clearButton.addEventListener('click', () => {
         startDateInput.value = '';
         endDateInput.value = '';
-        fetchFinancialData();
+        customerFilter.value = ''; // Limpa também o filtro de cliente
+        updateView();
     });
 
-    fetchFinancialData();
+    // Carga inicial
+    populateCustomerFilter(); // Popula o select de clientes
+    updateView(); // Faz a primeira busca de dados
 });

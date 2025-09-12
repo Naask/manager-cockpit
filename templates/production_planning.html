@@ -12,34 +12,60 @@
         .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
         .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; background-color: #007bff; }
         
-        .planning-grid-container { overflow-x: auto; padding-bottom: 1rem; }
-        .planning-grid { display: flex; gap: 1rem; min-width: min-content; }
-        .day-column { flex: 0 0 320px; width: 320px; background-color: #e9ecef; border-radius: 8px; }
-        .day-header { padding: 0.75rem; background-color: #343a40; color: white; border-radius: 6px 6px 0 0; position: sticky; top: 0; z-index: 10; }
+        .planning-grid { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
+        .day-column { flex: 0 0 320px; background-color: #e9ecef; border-radius: 8px; padding: 0.5rem; }
+        .day-header { padding: 0.75rem; background-color: #343a40; color: white; border-radius: 6px 6px 0 0; }
         .day-title { font-size: 1.2rem; font-weight: bold; margin: 0; }
         .day-load { font-size: 0.9rem; margin-top: 0.25rem; }
-        .orders-container { padding: 0.75rem; min-height: 400px; }
+        .orders-container { padding-top: 0.5rem; min-height: 400px; }
 
-        .order-card { background-color: white; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid #007bff; }
-        .order-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-        .order-card-title { font-weight: bold; margin: 0; }
+        /* --- ESTILO DO CARD ATUALIZADO --- */
+        .order-card {
+            background-color: white;
+            border-radius: 6px;
+            padding: 0.75rem 1rem; /* Padding vertical reduzido */
+            margin-bottom: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+            border-left: 5px solid #007bff; /* Barra lateral azul */
+
+            /* Novo layout em Grid para alinhar o rodapé */
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-areas:
+                "header header"
+                "delivery status";
+            align-items: center; /* Alinha verticalmente a info de entrega e os status */
+            row-gap: 0.5rem; /* Espaço entre o cabeçalho e o rodapé */
+        }
+        .order-card-header {
+            grid-area: header;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0; /* Removido para usar o row-gap do grid */
+        }
+        .order-card-title { font-weight: bold; margin: 0; font-size: 1rem; }
         .order-card-id { font-size: 0.85rem; color: #6c757d; }
         
-        .status-indicators { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.75rem; }
-        .status-circle { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #adb5bd; background-color: #f8f9fa; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+        .order-card p {
+            grid-area: delivery;
+            margin: 0; /* Margem removida para alinhar no grid */
+            font-size: 0.9rem;
+        }
+        .status-indicators {
+            grid-area: status;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-top: 0; /* Margem removida para alinhar no grid */
+        }
+        .status-circle { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #6c757d; background-color: white; cursor: pointer; position: relative; }
         .status-circle.completed { background-color: #28a745; border-color: #28a745; }
-        .status-label { font-size: 0.8rem; text-align: center; color: #6c757d; margin-top: 4px; font-weight: bold; }
+        .status-label { font-size: 0.8rem; text-align: center; color: #6c757d; }
         .status-item { display: flex; flex-direction: column; align-items: center; }
 
-        /* Estilos para o Modal de Detalhes */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 90%; max-width: 600px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e9ecef; padding-bottom: 1rem; margin-bottom: 1rem; }
-        .modal-title { margin: 0; }
-        .modal-close { font-size: 1.5rem; font-weight: bold; cursor: pointer; border: none; background: none; }
-        .modal-body { max-height: 60vh; overflow-y: auto; }
-        #modal-order-items { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        #modal-order-items th, #modal-order-items td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #dee2e6; }
+        .modal { /* Estilos para o pop-up de detalhes */ }
     </style>
 </head>
 <body>
@@ -52,32 +78,11 @@
             <input type="date" id="end-date">
             <button id="filter-button">Visualizar</button>
         </div>
-        <div class="planning-grid-container">
-            <div class="planning-grid" id="planning-grid">
-                <!-- As colunas dos dias serão inseridas aqui via JavaScript -->
-            </div>
+        <div class="planning-grid" id="planning-grid">
+            <!-- As colunas dos dias serão inseridas aqui via JavaScript -->
         </div>
     </main>
-
-    <!-- Modal para Detalhes do Pedido -->
-    <div id="order-details-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-title" class="modal-title">Detalhes do Pedido</h2>
-                <button id="modal-close-button" class="modal-close">&times;</button>
-            </div>
-            <div id="modal-body" class="modal-body">
-                <p><strong>Cliente:</strong> <span id="modal-customer-name"></span></p>
-                <p><strong>Prazo de Entrega:</strong> <span id="modal-pickup-datetime"></span></p>
-                <h3>Itens do Pedido:</h3>
-                <table id="modal-order-items">
-                    <thead><tr><th>Produto</th><th>Qtd.</th></tr></thead>
-                    <tbody><!-- Itens serão inseridos aqui --></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <script src="/static/planning.js"></script>
 </body>
 </html>
+

@@ -3,6 +3,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const endDateInput = document.getElementById('end-date');
     const filterButton = document.getElementById('filter-button');
     const planningGrid = document.getElementById('planning-grid');
+    const mainContainer = document.querySelector('main');
+    const toggleVisibilityButton = document.getElementById('toggle-visibility-button');
+    const eyeIconOpen = document.getElementById('eye-icon-open');
+    const eyeIconClosed = document.getElementById('eye-icon-closed');
 
     // Define as datas padrão (hoje até 7 dias para frente)
     const today = new Date();
@@ -10,6 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
     futureDate.setDate(today.getDate() + 7);
     startDateInput.value = today.toISOString().split('T')[0];
     endDateInput.value = futureDate.toISOString().split('T')[0];
+
+    function formatCurrency(amountInCents) {
+        if (amountInCents === null || amountInCents === undefined) return '0,00';
+        const amount = amountInCents / 100;
+        return amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Adiciona a lógica para o botão de visibilidade
+    if (toggleVisibilityButton) {
+        toggleVisibilityButton.addEventListener('click', () => {
+            mainContainer.classList.toggle('values-hidden');
+            const isHidden = mainContainer.classList.contains('values-hidden');
+            if (eyeIconOpen && eyeIconClosed) {
+                eyeIconOpen.style.display = isHidden ? 'none' : 'block';
+                eyeIconClosed.style.display = isHidden ? 'block' : 'none';
+            }
+        });
+    }
 
     async function fetchPlanningData(startDate, endDate) {
         planningGrid.innerHTML = '<p>Carregando planejamento...</p>';
@@ -35,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cria uma coluna para cada dia no intervalo
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = d.toISOString().split('T')[0];
-            const dayData = data.find(item => item.date === dateStr) || { orders: [], total_wash_kg: 0, total_pass_kg: 0 };
+            const dayData = data.find(item => item.date === dateStr) || { orders: [], total_wash_kg: 0, total_pass_kg: 0, total_value: 0 };
 
             const dayColumn = document.createElement('div');
             dayColumn.className = 'day-column';
@@ -43,8 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="day-header">
                     <h3 class="day-title">${d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })}</h3>
                     <div class="day-load">
-                        💧 Lavar: <strong>${(dayData.total_wash_kg || 0).toFixed(2)} kg</strong> | 
-                        💨 Passar: <strong>${(dayData.total_pass_kg || 0).toFixed(2)} kg</strong>
+                        Lavar: <strong>${(dayData.total_wash_kg || 0).toFixed(2)} kg</strong> | 
+                        Passar: <strong>${(dayData.total_pass_kg || 0).toFixed(2)} kg</strong>
+                    </div>
+                    <div class="day-financials financial-info">
+                        Total: <strong>R$ <span class="value-text">${formatCurrency(dayData.total_value)}</span></strong>
                     </div>
                 </div>
                 <div class="orders-container" id="orders-${dateStr}"></div>
@@ -72,7 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4 class="order-card-title">${order.customer_name}</h4>
                 <span class="order-card-id">#${order.order_id}</span>
             </div>
-            <p><strong>Entrega:</strong> ${new Date(order.pickup_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p class="order-delivery"><strong>Entrega:</strong> ${new Date(order.pickup_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p class="order-value financial-info"><strong>Total:</strong> R$ <span class="value-text">${formatCurrency(order.total_amount)}</span></p>
             <div class="status-indicators">
                 <div class="status-item">
                     <div class="status-circle ${order.is_washed ? 'completed' : ''}" data-status="is_washed"></div>
@@ -89,19 +115,17 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Adiciona evento de clique para atualizar o status
         card.querySelectorAll('.status-circle').forEach(circle => {
             circle.addEventListener('click', (e) => {
-                e.stopPropagation(); // Impede que o clique no círculo acione o clique no card
-                const statusType = e.target.dataset.status;
-                const currentStatus = e.target.classList.contains('completed');
-                updateOrderStatus(order.order_id, statusType, !currentStatus, e.target);
+                e.stopPropagation();
+                const statusType = e.currentTarget.dataset.status;
+                const currentStatus = e.currentTarget.classList.contains('completed');
+                updateOrderStatus(order.order_id, statusType, !currentStatus, e.currentTarget);
             });
         });
 
-        // Adiciona evento para mostrar detalhes (simples alert por enquanto)
         card.addEventListener('click', () => {
-            alert(`Detalhes do Pedido #${order.order_id}:\nCliente: ${order.customer_name}\nItens: (implementar busca de itens)`);
+             alert(`Detalhes do Pedido #${order.order_id}:\nCliente: ${order.customer_name}\nValor: R$ ${formatCurrency(order.total_amount)}`);
         });
 
         return card;
@@ -120,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error('Falha ao atualizar o status.');
             
-            // Atualiza a interface
             circleElement.classList.toggle('completed', newValue);
 
         } catch (error) {
@@ -139,6 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterButton.addEventListener('click', updateView);
     
-    // Carga inicial
     updateView();
 });
+

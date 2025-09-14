@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ESTADO DA APLICAÇÃO ---
     let allOrdersData = []; // Armazena todos os pedidos carregados
     let draggedCardInfo = null; // Armazena informações sobre o card a ser arrastado
+    let scrollInterval = null; // Para controlar o auto-scroll
 
     // --- INICIALIZAÇÃO ---
     function initialize() {
@@ -177,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return card;
     }
 
-    // --- LÓGICA DE DRAG-AND-DROP (ARRASTAR E SOLTAR) ---
+    // --- LÓGICA DE DRAG-AND-DROP E AUTO-SCROLL ---
     function handleDragStart(e) {
         const card = e.currentTarget;
         draggedCardInfo = {
@@ -186,6 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceTaskType: card.closest('.orders-container').dataset.taskType || 'delivery'
         };
         setTimeout(() => card.classList.add('dragging'), 0);
+        // Ativa o listener de scroll ao iniciar o arrasto
+        document.addEventListener('dragover', handleDragScrolling);
     }
 
     function handleDragEnd() {
@@ -193,6 +196,41 @@ document.addEventListener('DOMContentLoaded', () => {
             draggedCardInfo.element.classList.remove('dragging');
         }
         draggedCardInfo = null;
+        // Desativa o listener de scroll e para qualquer scroll em andamento
+        document.removeEventListener('dragover', handleDragScrolling);
+        if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+        }
+    }
+
+    function handleDragScrolling(e) {
+        if (!draggedCardInfo) return;
+
+        const y = e.clientY;
+        const windowHeight = window.innerHeight;
+        const scrollZone = 80; // Zona de ativação do scroll (80px da borda)
+        const scrollSpeed = 15; // Velocidade do scroll
+
+        // Se o mouse está perto da borda de baixo
+        if (y > windowHeight - scrollZone) {
+            if (!scrollInterval) { // Inicia o scroll apenas se não estiver a rolar
+                scrollInterval = setInterval(() => { window.scrollBy(0, scrollSpeed); }, 15);
+            }
+        }
+        // Se o mouse está perto da borda de cima
+        else if (y < scrollZone) {
+            if (!scrollInterval) { // Inicia o scroll apenas se não estiver a rolar
+                scrollInterval = setInterval(() => { window.scrollBy(0, -scrollSpeed); }, 15);
+            }
+        }
+        // Se o mouse está no meio da tela
+        else {
+            if (scrollInterval) { // Para o scroll se estiver a rolar
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        }
     }
     
     function handleDragOver(e) {

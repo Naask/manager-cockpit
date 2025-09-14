@@ -1,86 +1,77 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Referências aos elementos de controle
+    // --- REFERÊNCIAS AOS ELEMENTOS DO DOM ---
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const filterButton = document.getElementById('filter-button');
-    
-    // Referências aos 3 contêineres de grades
     const deliveryScheduleGrid = document.getElementById('delivery-schedule-grid');
     const washScheduleGrid = document.getElementById('wash-schedule-grid');
     const passScheduleGrid = document.getElementById('pass-schedule-grid');
-
-    // Referências para o botão de visibilidade
     const mainContainer = document.querySelector('main');
     const toggleVisibilityButton = document.getElementById('toggle-visibility-button');
     const eyeIconOpen = document.getElementById('eye-icon-open');
     const eyeIconClosed = document.getElementById('eye-icon-closed');
 
-    // Define as datas padrão
-    const today = new Date();
-    const futureDate = new Date();
-    futureDate.setDate(today.getDate() + 7);
-    startDateInput.value = today.toISOString().split('T')[0];
-    endDateInput.value = futureDate.toISOString().split('T')[0];
+    // --- ESTADO DA APLICAÇÃO ---
+    let allOrdersData = []; // Armazena todos os pedidos carregados
+    let draggedCardInfo = null; // Armazena informações sobre o card a ser arrastado
 
-    // Adiciona o evento de clique para o botão de visibilidade
-    toggleVisibilityButton.addEventListener('click', () => {
-        mainContainer.classList.toggle('values-hidden');
-        const isHidden = mainContainer.classList.contains('values-hidden');
-        eyeIconOpen.style.display = isHidden ? 'none' : 'block';
-        eyeIconClosed.style.display = isHidden ? 'block' : 'none';
-    });
-
-    // Função para formatar valores monetários
-    function formatCurrency(amountInCents) {
-        if (amountInCents === null || amountInCents === undefined) return '0,00';
-        const amount = amountInCents / 100;
-        return amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // --- INICIALIZAÇÃO ---
+    function initialize() {
+        setDefaultDates();
+        addEventListeners();
+        updateView();
     }
 
-    async function fetchAndRenderSchedules(startDate, endDate) {
-        // Mostra mensagem de carregamento em todas as grades
-        const loadingHTML = '<p style="padding: 1rem;">Carregando planejamento...</p>';
-        deliveryScheduleGrid.innerHTML = loadingHTML;
-        washScheduleGrid.innerHTML = loadingHTML;
-        passScheduleGrid.innerHTML = loadingHTML;
+    function setDefaultDates() {
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + 7);
+        startDateInput.value = today.toISOString().split('T')[0];
+        endDateInput.value = futureDate.toISOString().split('T')[0];
+    }
 
+    function addEventListeners() {
+        filterButton.addEventListener('click', updateView);
+        toggleVisibilityButton.addEventListener('click', toggleValuesVisibility);
+    }
+
+    // --- LÓGICA DE DADOS E RENDERIZAÇÃO ---
+    async function fetchAndRenderSchedules(startDate, endDate) {
+        const loadingHTML = '<p style="padding: 1rem;">A carregar planeamento...</p>';
+        [deliveryScheduleGrid, washScheduleGrid, passScheduleGrid].forEach(grid => grid.innerHTML = loadingHTML);
         try {
             const url = `/api/planning/daily-orders?start_date=${startDate}&end_date=${endDate}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Erro na API: ${response.statusText}`);
-            
             const ordersByDay = await response.json();
+            
+            // Armazena todos os pedidos para fácil acesso posterior
+            allOrdersData = ordersByDay.flatMap(day => day.orders);
+            
             renderGrids(ordersByDay, startDate, endDate);
-
         } catch (error) {
-            console.error("Erro ao carregar dados de planejamento:", error);
+            console.error("Erro ao carregar dados de planeamento:", error);
             const errorHTML = '<p style="padding: 1rem;">Erro ao carregar dados. Tente novamente.</p>';
-            deliveryScheduleGrid.innerHTML = errorHTML;
-            washScheduleGrid.innerHTML = errorHTML;
-            passScheduleGrid.innerHTML = errorHTML;
+            [deliveryScheduleGrid, washScheduleGrid, passScheduleGrid].forEach(grid => grid.innerHTML = errorHTML);
         }
     }
 
     function renderGrids(ordersByDay, startDate, endDate) {
-        // Limpa todas as grades
-        deliveryScheduleGrid.innerHTML = '';
-        washScheduleGrid.innerHTML = '';
-        passScheduleGrid.innerHTML = '';
+        [deliveryScheduleGrid, washScheduleGrid, passScheduleGrid].forEach(grid => grid.innerHTML = '');
         
         const start = new Date(startDate + 'T00:00:00');
         const end = new Date(endDate + 'T23:59:59');
 
-        // Itera por cada dia no intervalo para criar as colunas em todas as grades
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = d.toISOString().split('T')[0];
             const dayData = ordersByDay.find(item => item.date === dateStr) || { orders: [], total_wash_kg: 0, total_pass_kg: 0, total_value: 0 };
             
-            // Cria a coluna para cada uma das 3 grades
-            deliveryScheduleGrid.appendChild(createDayColumn(d, dayData, true)); // Coluna com detalhes
-            washScheduleGrid.appendChild(createDayColumn(d, dayData, false));   // Coluna simples
-            passScheduleGrid.appendChild(createDayColumn(d, dayData, false));  // Coluna simples
+            // Cria e anexa as colunas
+            deliveryScheduleGrid.appendChild(createDayColumn(d, dayData, true));
+            washScheduleGrid.appendChild(createDayColumn(d, dayData, false, 'wash'));
+            passScheduleGrid.appendChild(createDayColumn(d, dayData, false, 'pass'));
 
-            // Popula a grade de entrega com os cards dos pedidos
+            // Popula a grade de entrega
             if (dayData && dayData.orders.length > 0) {
                 const deliveryOrdersContainer = deliveryScheduleGrid.querySelector(`[data-date="${dateStr}"] .orders-container`);
                 dayData.orders.forEach(order => {
@@ -90,13 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Função auxiliar para criar uma coluna de dia
-    function createDayColumn(date, dayData, showDetails) {
+    function createDayColumn(date, dayData, showDetails, taskType = null) {
         const dateStr = date.toISOString().split('T')[0];
         const dayColumn = document.createElement('div');
         dayColumn.className = 'day-column';
         dayColumn.dataset.date = dateStr;
-        
+
         let detailsHTML = '';
         if (showDetails) {
             detailsHTML = `
@@ -104,8 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     Lavar: <strong>${(dayData.total_wash_kg || 0).toFixed(2)} kg</strong> | 
                     Passar: <strong>${(dayData.total_pass_kg || 0).toFixed(2)} kg</strong>
                 </div>
-                <div class="day-financials">
-                    Total: <strong class="financial-info"><span class="value-text">R$ ${formatCurrency(dayData.total_value)}</span></strong>
+                <div class="day-financials financial-info">
+                    Total: <span class="value-text">R$ ${formatCurrency(dayData.total_value)}</span>
                 </div>
             `;
         }
@@ -115,44 +105,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3 class="day-title">${date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</h3>
                 ${detailsHTML}
             </div>
-            <div class="orders-container"></div>
+            <div class="orders-container" data-task-type="${taskType || ''}"></div>
         `;
+
+        if (taskType) {
+            const container = dayColumn.querySelector('.orders-container');
+            container.addEventListener('dragover', handleDragOver);
+            container.addEventListener('dragleave', handleDragLeave);
+            container.addEventListener('drop', handleDrop);
+        }
         return dayColumn;
     }
 
-    // Função auxiliar para criar um card de pedido detalhado
-    function createOrderCard(order) {
+    function createOrderCard(order, isScheduled = false) {
         const card = document.createElement('div');
         card.className = 'order-card';
         card.dataset.orderId = order.order_id;
+        card.draggable = true; // Todos os cards são arrastáveis
+
+        const cancelButtonHTML = isScheduled ? '<button class="cancel-schedule-btn">×</button>' : '';
+
         card.innerHTML = `
+            ${cancelButtonHTML}
             <div class="order-card-header">
                 <div>
                     <h4 class="order-card-title">${order.customer_name}</h4>
-                    <span class="order-card-subtitle">#${order.order_id}</span>
+                    <div class="order-card-subtitle">${order.order_id}</div>
                 </div>
                 <div class="order-card-value financial-info">
                     <span class="value-text">R$ ${formatCurrency(order.total_amount)}</span>
                 </div>
             </div>
-            <p>Entrega: ${new Date(order.pickup_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-            <div class="status-indicators">
-                <div class="status-item">
-                    <div class="status-circle ${order.is_washed ? 'completed' : ''}" data-status="is_washed"></div>
-                    <span class="status-label">L</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-circle ${order.is_passed ? 'completed' : ''}" data-status="is_passed"></div>
-                    <span class="status-label">P</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-circle ${order.is_packed ? 'completed' : ''}" data-status="is_packed"></div>
-                    <span class="status-label">E</span>
+            <div class="order-card-footer">
+                <p>Entrega: ${new Date(order.pickup_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <div class="status-circle ${order.is_washed ? 'completed' : ''}" data-status="is_washed"></div>
+                        <span class="status-label">L</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-circle ${order.is_passed ? 'completed' : ''}" data-status="is_passed"></div>
+                        <span class="status-label">P</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-circle ${order.is_packed ? 'completed' : ''}" data-status="is_packed"></div>
+                        <span class="status-label">E</span>
+                    </div>
                 </div>
             </div>
         `;
         
-        // Adiciona evento de clique para atualizar o status
+        // Adiciona listeners de eventos
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+
+        if (isScheduled) {
+            card.querySelector('.cancel-schedule-btn').addEventListener('click', handleCancelSchedule);
+        }
+
         card.querySelectorAll('.status-circle').forEach(circle => {
             circle.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -161,8 +171,102 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateOrderStatus(order.order_id, statusType, !currentStatus, e.currentTarget);
             });
         });
-
         return card;
+    }
+
+    // --- LÓGICA DE DRAG-AND-DROP (ARRASTAR E SOLTAR) ---
+    function handleDragStart(e) {
+        const card = e.currentTarget;
+        draggedCardInfo = {
+            orderId: card.dataset.orderId,
+            element: card, // Referência ao elemento original
+            sourceTaskType: card.closest('.orders-container').dataset.taskType || 'delivery'
+        };
+        setTimeout(() => card.classList.add('dragging'), 0);
+    }
+
+    function handleDragEnd() {
+        if (draggedCardInfo && draggedCardInfo.element) {
+            draggedCardInfo.element.classList.remove('dragging');
+        }
+        draggedCardInfo = null; // Limpa a referência
+    }
+    
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+
+    async function handleDrop(e) {
+        e.preventDefault();
+        const dropContainer = e.currentTarget;
+        dropContainer.classList.remove('drag-over');
+
+        if (!draggedCardInfo) return;
+
+        const { orderId, element: originalCard, sourceTaskType } = draggedCardInfo;
+        const targetTaskType = dropContainer.dataset.taskType;
+        const targetDate = dropContainer.closest('.day-column').dataset.date;
+
+        // Se o card for movido para uma área de programação (não a de entrega)
+        if (targetTaskType) {
+            try {
+                // Comunica com o backend para agendar
+                await scheduleTask(orderId, targetTaskType, targetDate);
+
+                // Cria uma cópia visual do card no novo local
+                const originalCardData = allOrdersData.find(o => o.order_id == orderId);
+                if (originalCardData) {
+                    const newCard = createOrderCard(originalCardData, true);
+                    dropContainer.appendChild(newCard);
+                }
+                
+                // Se o card for movido dentro da mesma área (ex: Lavar -> Lavar),
+                // remove o original para simular um "mover" em vez de "copiar".
+                if (sourceTaskType === targetTaskType && sourceTaskType !== 'delivery') {
+                    originalCard.remove();
+                }
+
+            } catch (error) {
+                console.error("Erro no processo de drop:", error);
+                alert("Ocorreu um erro ao mover a tarefa. A página será atualizada para garantir a consistência.");
+                window.location.reload();
+            }
+        }
+    }
+    
+    // --- FUNÇÕES DE API ---
+    async function scheduleTask(orderId, taskType, scheduleDate) {
+        const response = await fetch('/api/order/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, task_type: taskType, schedule_date: scheduleDate })
+        });
+        if (!response.ok) throw new Error('Falha ao agendar tarefa no backend.');
+    }
+
+    async function handleCancelSchedule(e) {
+        e.stopPropagation();
+        const card = e.currentTarget.closest('.order-card');
+        const orderId = card.dataset.orderId;
+        const taskType = card.closest('.orders-container').dataset.taskType;
+
+        try {
+            const response = await fetch('/api/order/cancel-schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: orderId, task_type: taskType })
+            });
+            if (!response.ok) throw new Error('Falha ao cancelar agendamento.');
+            card.remove();
+        } catch (error) {
+            console.error("Erro ao cancelar:", error);
+            alert('Não foi possível cancelar o agendamento.');
+        }
     }
 
     async function updateOrderStatus(orderId, statusType, newValue, circleElement) {
@@ -176,15 +280,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     status_value: newValue
                 })
             });
-            const result = await response.json();
-            if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Falha ao atualizar o status.');
-            }
+            if (!response.ok) throw new Error('Falha ao atualizar o status.');
             circleElement.classList.toggle('completed', newValue);
         } catch (error) {
             console.error("Erro ao atualizar status:", error);
             alert('Não foi possível atualizar o status. Verifique o console.');
         }
+    }
+    
+    // --- UTILITÁRIOS ---
+    function formatCurrency(amountInCents) {
+        if (amountInCents === null || amountInCents === undefined) return '0,00';
+        const amount = amountInCents / 100;
+        return amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function toggleValuesVisibility() {
+        mainContainer.classList.toggle('values-hidden');
+        const isHidden = mainContainer.classList.contains('values-hidden');
+        eyeIconOpen.style.display = isHidden ? 'none' : 'block';
+        eyeIconClosed.style.display = isHidden ? 'block' : 'none';
     }
 
     function updateView() {
@@ -195,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    filterButton.addEventListener('click', updateView);
-    updateView(); // Carga inicial
+    // --- EXECUÇÃO INICIAL ---
+    initialize();
 });
 

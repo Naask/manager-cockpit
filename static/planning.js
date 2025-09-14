@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`Erro na API: ${response.statusText}`);
             const ordersByDay = await response.json();
             
-            // Armazena todos os pedidos para fácil acesso posterior
             allOrdersData = ordersByDay.flatMap(day => day.orders);
             
             renderGrids(ordersByDay, startDate, endDate);
@@ -66,12 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = d.toISOString().split('T')[0];
             const dayData = ordersByDay.find(item => item.date === dateStr) || { orders: [], total_wash_kg: 0, total_pass_kg: 0, total_value: 0 };
             
-            // Cria e anexa as colunas
             deliveryScheduleGrid.appendChild(createDayColumn(d, dayData, true));
             washScheduleGrid.appendChild(createDayColumn(d, dayData, false, 'wash'));
             passScheduleGrid.appendChild(createDayColumn(d, dayData, false, 'pass'));
 
-            // Popula a grade de entrega
             if (dayData && dayData.orders.length > 0) {
                 const deliveryOrdersContainer = deliveryScheduleGrid.querySelector(`[data-date="${dateStr}"] .orders-container`);
                 dayData.orders.forEach(order => {
@@ -81,14 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function createDayColumn(date, dayData, showDetails, taskType = null) {
+    function createDayColumn(date, dayData, isDelivery, taskType = null) {
         const dateStr = date.toISOString().split('T')[0];
         const dayColumn = document.createElement('div');
         dayColumn.className = 'day-column';
         dayColumn.dataset.date = dateStr;
 
         let detailsHTML = '';
-        if (showDetails) {
+        if (isDelivery) {
             detailsHTML = `
                 <div class="day-load">
                     Lavar: <strong>${(dayData.total_wash_kg || 0).toFixed(2)} kg</strong> | 
@@ -96,6 +93,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="day-financials financial-info">
                     Total: <span class="value-text">R$ ${formatCurrency(dayData.total_value)}</span>
+                </div>
+            `;
+        } else {
+            detailsHTML = `
+                <div class="day-scheduled-financials financial-info" data-total-container="true">
+                    Total Agendado: <span class="value-text">R$ 0,00</span>
                 </div>
             `;
         }
@@ -121,7 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'order-card';
         card.dataset.orderId = order.order_id;
-        card.draggable = true; // Todos os cards são arrastáveis
+        card.dataset.orderValue = order.total_amount; // Armazena o valor do pedido no card
+        card.draggable = true; 
 
         const cancelButtonHTML = isScheduled ? '<button class="cancel-schedule-btn">×</button>' : '';
 
@@ -155,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Adiciona listeners de eventos
         card.addEventListener('dragstart', handleDragStart);
         card.addEventListener('dragend', handleDragEnd);
 
@@ -179,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = e.currentTarget;
         draggedCardInfo = {
             orderId: card.dataset.orderId,
-            element: card, // Referência ao elemento original
+            element: card,
             sourceTaskType: card.closest('.orders-container').dataset.taskType || 'delivery'
         };
         setTimeout(() => card.classList.add('dragging'), 0);
@@ -189,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (draggedCardInfo && draggedCardInfo.element) {
             draggedCardInfo.element.classList.remove('dragging');
         }
-        draggedCardInfo = null; // Limpa a referência
+        draggedCardInfo = null;
     }
     
     function handleDragOver(e) {
@@ -210,25 +213,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { orderId, element: originalCard, sourceTaskType } = draggedCardInfo;
         const targetTaskType = dropContainer.dataset.taskType;
-        const targetDate = dropContainer.closest('.day-column').dataset.date;
+        const targetColumn = dropContainer.closest('.day-column');
+        const targetDate = targetColumn.dataset.date;
 
-        // Se o card for movido para uma área de programação (não a de entrega)
         if (targetTaskType) {
             try {
-                // Comunica com o backend para agendar
                 await scheduleTask(orderId, targetTaskType, targetDate);
-
-                // Cria uma cópia visual do card no novo local
                 const originalCardData = allOrdersData.find(o => o.order_id == orderId);
+
                 if (originalCardData) {
                     const newCard = createOrderCard(originalCardData, true);
                     dropContainer.appendChild(newCard);
+                    updateColumnTotals(targetColumn);
                 }
                 
-                // Se o card for movido dentro da mesma área (ex: Lavar -> Lavar),
-                // remove o original para simular um "mover" em vez de "copiar".
                 if (sourceTaskType === targetTaskType && sourceTaskType !== 'delivery') {
+                    const sourceColumn = originalCard.closest('.day-column');
                     originalCard.remove();
+                    updateColumnTotals(sourceColumn);
                 }
 
             } catch (error) {
@@ -239,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- FUNÇÕES DE API ---
+    // --- FUNÇÕES DE API E EVENTOS ---
     async function scheduleTask(orderId, taskType, scheduleDate) {
         const response = await fetch('/api/order/schedule', {
             method: 'POST',
@@ -252,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleCancelSchedule(e) {
         e.stopPropagation();
         const card = e.currentTarget.closest('.order-card');
+        const column = card.closest('.day-column');
         const orderId = card.dataset.orderId;
         const taskType = card.closest('.orders-container').dataset.taskType;
 
@@ -263,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error('Falha ao cancelar agendamento.');
             card.remove();
+            updateColumnTotals(column);
         } catch (error) {
             console.error("Erro ao cancelar:", error);
             alert('Não foi possível cancelar o agendamento.');
@@ -289,6 +293,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- UTILITÁRIOS ---
+    function updateColumnTotals(column) {
+        if (!column) return;
+        const totalContainer = column.querySelector('[data-total-container]');
+        if (!totalContainer) return;
+
+        const cards = column.querySelectorAll('.order-card');
+        let totalValue = 0;
+        cards.forEach(card => {
+            totalValue += parseFloat(card.dataset.orderValue) || 0;
+        });
+        
+        const valueTextElement = totalContainer.querySelector('.value-text');
+        if (valueTextElement) {
+            valueTextElement.textContent = `R$ ${formatCurrency(totalValue)}`;
+        }
+    }
+
     function formatCurrency(amountInCents) {
         if (amountInCents === null || amountInCents === undefined) return '0,00';
         const amount = amountInCents / 100;

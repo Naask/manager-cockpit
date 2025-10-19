@@ -127,8 +127,88 @@ def gestao_page():
 
 
 # --- ROTAS DE RELATÓRIOS GERENCIAIS (GRÁFICOS) ---
+# painel_app.py
+
+# --- ROTAS DE RELATÓRIOS GERENCIAIS (GRÁFICOS) ---
 @app.route('/api/reports/summary')
 def get_reports_summary():
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    period_formats = {
+        'daily': "strftime('%Y-%m-%d', created_at)",
+        'week': "strftime('%Y-W%W', created_at)",
+        'month': "strftime('%Y-%m', created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', created_at)"
+    }
+    period_format = period_formats.get(period, period_formats['month'])
+
+    params = []
+    where_clause = ""
+    if start_date and end_date:
+        where_clause = "WHERE created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    # --- CORREÇÃO APLICADA AQUI ---
+    # A query foi reestruturada para calcular todos os dados necessários de uma só vez,
+    # eliminando o loop e a consulta secundária (problema N+1).
+    query = f"""
+        WITH CustomerFirstPeriod AS (
+            -- 1. Calcula o período de aquisição de cada cliente
+            SELECT
+                customer_id,
+                {period_format.replace('created_at', 'MIN(created_at)')} as first_period
+            FROM orders
+            GROUP BY customer_id
+        ),
+        PeriodData AS (
+            -- 2. Junta os dados de cada pedido com o período de aquisição do seu cliente
+            SELECT
+                {period_format} as period,
+                o.customer_id,
+                o.order_id,
+                o.total_amount,
+                cfp.first_period
+            FROM orders o
+            JOIN CustomerFirstPeriod cfp ON o.customer_id = cfp.customer_id
+            {where_clause}
+        ),
+        CustomerRevenuePerPeriod AS (
+            -- 3. (NOVO) Pré-calcula o faturamento total por cliente em cada período
+            SELECT
+                period,
+                SUM(total_amount) as customer_revenue
+            FROM PeriodData
+            GROUP BY period, customer_id
+        )
+        -- 4. Agrega os resultados finais para a resposta da API
+        SELECT
+            pd.period,
+            COUNT(DISTINCT pd.order_id) as order_count,
+            SUM(pd.total_amount) as total_revenue,
+            COUNT(DISTINCT pd.customer_id) as distinct_customer_count,
+            COUNT(DISTINCT CASE WHEN pd.period = pd.first_period THEN pd.customer_id ELSE NULL END) as new_customer_count,
+            COUNT(DISTINCT CASE WHEN pd.period != pd.first_period THEN pd.customer_id ELSE NULL END) as returning_customer_count,
+            GROUP_CONCAT(pd.total_amount) as ticket_values,
+            -- Usa a CTE pré-calculada para agregar os faturamentos por cliente
+            (SELECT GROUP_CONCAT(crp.customer_revenue)
+             FROM CustomerRevenuePerPeriod crp
+             WHERE crp.period = pd.period) as revenue_per_customer_values
+        FROM PeriodData pd
+        GROUP BY pd.period
+        ORDER BY pd.period ASC;
+    """
+    conn = get_db_connection()
+    report_data = conn.execute(query, params).fetchall()
+    conn.close()
+
+    # Com a nova query, o processamento em Python não é mais necessário.
+    # A resposta já vem pronta do banco de dados.
+    return jsonify([dict(row) for row in report_data])
     period = request.args.get('period', 'month')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')

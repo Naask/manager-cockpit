@@ -44,6 +44,10 @@ def get_customers():
     conn.close()
     return jsonify([dict(row) for row in customers])
 
+# painel_app.py
+
+# painel_app.py
+
 @app.route('/api/gestao/financial-summary')
 def get_financial_summary():
     start_date = request.args.get('start_date')
@@ -93,19 +97,47 @@ def get_financial_summary():
     """
     all_completed_orders = conn.execute(all_completed_query, params).fetchall()
     
-    open_orders_kpis_query = f"""
-        WITH OpenOrders AS (
-            SELECT order_id, total_amount, payment_status, customer_id FROM orders WHERE execution_status != 'CONCLUIDO'
+    stock_summary_query = f"""
+        WITH OrderBalance AS (
+            SELECT
+                order_id,
+                total_amount,
+                COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.order_id), 0) as total_paid
+            FROM orders o
+            WHERE execution_status != 'CONCLUIDO'
+            {f"AND customer_id = '{customer_id}'" if customer_id else ""}
         )
         SELECT
-            (SELECT COUNT(order_id) FROM OpenOrders {f"WHERE customer_id = '{customer_id}'" if customer_id else ""}) as total_open_count,
-            (SELECT SUM(total_amount) FROM OpenOrders {f"WHERE customer_id = '{customer_id}'" if customer_id else ""}) as total_open_value,
-            (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status = 'PAGO' {f"AND customer_id = '{customer_id}'" if customer_id else ""}) as open_and_paid_count,
-            (SELECT SUM(total_amount) FROM OpenOrders WHERE payment_status = 'PAGO' {f"AND customer_id = '{customer_id}'" if customer_id else ""}) as open_and_paid_value,
-            (SELECT COUNT(order_id) FROM OpenOrders WHERE payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE') {f"AND customer_id = '{customer_id}'" if customer_id else ""}) as open_and_unpaid_count,
-            (SELECT SUM(o.total_amount - COALESCE(p.total_paid, 0)) FROM OpenOrders o LEFT JOIN (SELECT order_id, SUM(amount) as total_paid FROM order_payments GROUP BY order_id) p ON o.order_id = p.order_id WHERE o.payment_status IN ('AGUARDANDO_PAGAMENTO', 'PAGO_PARCIALMENTE') {f"AND o.customer_id = '{customer_id}'" if customer_id else ""}) as open_and_unpaid_value
+            o.execution_status,
+            CASE WHEN o.payment_status = 'PAGO' THEN 'paid' ELSE 'unpaid' END as payment_group,
+            COUNT(o.order_id) as order_count,
+            SUM(o.total_amount) as total_value,
+            SUM(o.total_amount - ob.total_paid) as pending_value
+        FROM orders o
+        JOIN OrderBalance ob ON o.order_id = ob.order_id
+        WHERE o.execution_status != 'CONCLUIDO'
+        {f"AND o.customer_id = '{customer_id}'" if customer_id else ""}
+        GROUP BY o.execution_status, payment_group;
     """
-    open_orders_kpis = conn.execute(open_orders_kpis_query).fetchone()
+    stock_summary_raw = conn.execute(stock_summary_query).fetchall()
+    
+    stock_summary = {
+        'EM_EXECUCAO': {'total_count': 0, 'total_value': 0, 'paid_count': 0, 'paid_value': 0, 'unpaid_count': 0, 'unpaid_value': 0},
+        'AGUARDANDO_ENTREGA': {'total_count': 0, 'total_value': 0, 'paid_count': 0, 'paid_value': 0, 'unpaid_count': 0, 'unpaid_value': 0},
+        'AGUARDANDO_RETIRADA': {'total_count': 0, 'total_value': 0, 'paid_count': 0, 'paid_value': 0, 'unpaid_count': 0, 'unpaid_value': 0}
+    }
+
+    for row in stock_summary_raw:
+        status = row['execution_status']
+        if status in stock_summary:
+            stock_summary[status]['total_count'] += row['order_count']
+            stock_summary[status]['total_value'] += row['total_value']
+            if row['payment_group'] == 'paid':
+                stock_summary[status]['paid_count'] = row['order_count']
+                stock_summary[status]['paid_value'] = row['total_value']
+            else:
+                stock_summary[status]['unpaid_count'] = row['order_count']
+                stock_summary[status]['unpaid_value'] = row['pending_value']
 
     in_progress_orders_query = f"""
         SELECT
@@ -118,8 +150,38 @@ def get_financial_summary():
     """
     in_progress_orders = conn.execute(in_progress_orders_query).fetchall()
 
+    # --- CORREÇÃO APLICADA AQUI ---
+    # A query foi alterada para calcular o saldo a partir da tabela ledger_transactions
+    # e agora também filtra pelo cliente, se um for selecionado no painel.
+    customer_balance_params = []
+    customer_balance_where_clause = ""
+    if customer_id:
+        customer_balance_where_clause = "WHERE customer_id = ?"
+        customer_balance_params.append(customer_id)
+
+    customer_balance_query = f"""
+        SELECT SUM(
+            CASE 
+                WHEN transaction_type IN ('PAYMENT_RECEIVED', 'BONUS_ADDED', 'BALANCE_CORRECTION_CREDIT') THEN amount
+                WHEN transaction_type IN ('SALE', 'DISCOUNT_APPLIED', 'BALANCE_CORRECTION_DEBIT') THEN -amount
+                ELSE 0 
+            END
+        ) as total_balance 
+        FROM ledger_transactions
+        {customer_balance_where_clause}
+    """
+    customer_balance_data = conn.execute(customer_balance_query, customer_balance_params).fetchone()
+    customer_total_balance = customer_balance_data['total_balance'] if customer_balance_data and customer_balance_data['total_balance'] is not None else 0
+
     conn.close()
-    return jsonify({'completed_kpis': dict(completed_kpis) if completed_kpis else {}, 'pending_orders': [dict(row) for row in pending_orders], 'all_completed_orders': [dict(row) for row in all_completed_orders], 'open_orders_kpis': dict(open_orders_kpis) if open_orders_kpis else {}, 'in_progress_orders': [dict(row) for row in in_progress_orders]})
+    return jsonify({
+        'completed_kpis': dict(completed_kpis) if completed_kpis else {},
+        'pending_orders': [dict(row) for row in pending_orders],
+        'all_completed_orders': [dict(row) for row in all_completed_orders],
+        'stock_summary': stock_summary,
+        'in_progress_orders': [dict(row) for row in in_progress_orders],
+        'customer_total_balance': customer_total_balance
+    })
 
 @app.route('/gestao')
 def gestao_page():

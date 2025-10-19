@@ -45,13 +45,46 @@
         <section class="kpi-container">
             <div class="kpi-card"><div class="kpi-title">Faturamento Bruto <span>(<span id="kpi-orders-count">0</span> pedidos)</span></div><div class="kpi-value" id="kpi-gross-revenue">R$ 0,00</div></div>
             <div class="kpi-card"><div class="kpi-title">Total Recebido <span>(<span id="kpi-paid-orders-count">0</span> pedidos)</span></div><div class="kpi-value" id="kpi-total-received">R$ 0,00</div></div>
-            <div class="kpi-card"><div class="kpi-title">A Receber <span>(<span id="pending-orders-count">0</span> pedidos)</span></div><div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div></div>
+            <div class="kpi-card"><div class="kpi-title">A Receber (Concluídos) <span>(<span id="pending-orders-count">0</span>)</span></div><div class="kpi-value pending" id="kpi-pending-balance">R$ 0,00</div></div>
+            <div class="kpi-card"><div class="kpi-title">Estoque Saldo Clientes</div><div class="kpi-value" id="kpi-customer-balance" style="color: #28a745;">R$ 0,00</div></div>
         </section>
         
-        <section class="kpi-container">
-            <div class="kpi-card"><div class="kpi-title">Valor em Aberto <span>(<span id="kpi-total-open-count">0</span> pedidos)</span></div><div class="kpi-value" id="kpi-total-open-value">R$ 0,00</div></div>
-            <div class="kpi-card"><div class="kpi-title">Abertos e Não Pagos <span>(<span id="kpi-open-unpaid-count">0</span> pedidos)</span></div><div class="kpi-value pending" id="kpi-open-unpaid-value">R$ 0,00</div></div>
-            <div class="kpi-card"><div class="kpi-title">Abertos e Pagos <span>(<span id="kpi-open-paid-count">0</span> pedidos)</span></div><div class="kpi-value" id="kpi-open-paid-value">R$ 0,00</div></div>
+        <section class="report-container">
+            <h2>Visão Operacional (Estoque)</h2>
+            <div class="kpi-container" style="align-items: flex-start; margin-top: 1.5rem;">
+                <div class="kpi-card">
+                    <div class="kpi-title"><strong>EM EXECUÇÃO</strong></div>
+                    <div class="kpi-value" id="stock-inprogress-total-value">R$ 0,00</div>
+                    <div class="kpi-title"><span>(<span id="stock-inprogress-total-count">0</span> pedidos)</span></div>
+                    <hr style="margin: 1rem 0;">
+                    <div class="kpi-title">Pagos: <strong id="stock-inprogress-paid-value" style="color: #28a745;">R$ 0,00</strong> (<span id="stock-inprogress-paid-count">0</span>)</div>
+                    <div class="kpi-title">A Receber: <strong id="stock-inprogress-unpaid-value" style="color: #007bff;">R$ 0,00</strong> (<span id="stock-inprogress-unpaid-count">0</span>)</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title"><strong>AGUARDANDO ENTREGA</strong></div>
+                    <div class="kpi-value" id="stock-delivery-total-value">R$ 0,00</div>
+                    <div class="kpi-title"><span>(<span id="stock-delivery-total-count">0</span> pedidos)</span></div>
+                    <hr style="margin: 1rem 0;">
+                    <div class="kpi-title">Pagos: <strong id="stock-delivery-paid-value" style="color: #28a745;">R$ 0,00</strong> (<span id="stock-delivery-paid-count">0</span>)</div>
+                    <div class="kpi-title">A Receber: <strong id="stock-delivery-unpaid-value" style="color: #007bff;">R$ 0,00</strong> (<span id="stock-delivery-unpaid-count">0</span>)</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title"><strong>AGUARDANDO RETIRADA</strong></div>
+                    <div class="kpi-value" id="stock-pickup-total-value">R$ 0,00</div>
+                    <div class="kpi-title"><span>(<span id="stock-pickup-total-count">0</span> pedidos)</span></div>
+                    <hr style="margin: 1rem 0;">
+                    <div class="kpi-title">Pagos: <strong id="stock-pickup-paid-value" style="color: #28a745;">R$ 0,00</strong> (<span id="stock-pickup-paid-count">0</span>)</div>
+                    <div class="kpi-title">A Receber: <strong id="stock-pickup-unpaid-value" style="color: #007bff;">R$ 0,00</strong> (<span id="stock-pickup-unpaid-count">0</span>)</div>
+                </div>
+                <div class="kpi-card" style="background-color: #f8f9fa;">
+                    <div class="kpi-title"><strong>TOTAL EM ESTOQUE</strong></div>
+                    <div class="kpi-value" id="stock-total-value">R$ 0,00</div>
+                    <div class="kpi-title"><span>(<span id="stock-total-count">0</span> pedidos)</span></div>
+                    <hr style="margin: 1rem 0;">
+                    <div class="kpi-title">Pagos: <strong id="stock-total-paid-value" style="color: #28a745;">R$ 0,00</strong> (<span id="stock-total-paid-count">0</span>)</div>
+                    <div class="kpi-title">A Receber: <strong id="stock-total-unpaid-value" style="color: #007bff;">R$ 0,00</strong> (<span id="stock-total-unpaid-count">0</span>)</div>
+                </div>
+            </div>
         </section>
 
         <section class="report-container">

@@ -55,26 +55,63 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
 
-            // 1. Preenche os KPIs de pedidos CONCLUÍDOS
+            // 1. Preenche os KPIs de pedidos CONCLUÍDOS e Saldo de Clientes
             const completedKpis = data.completed_kpis;
             const pendingBalance = (completedKpis.gross_revenue || 0) - (completedKpis.total_received || 0);
             
             document.getElementById('kpi-gross-revenue').textContent = formatCurrency(completedKpis.gross_revenue);
             document.getElementById('kpi-total-received').textContent = formatCurrency(completedKpis.total_received);
             document.getElementById('kpi-pending-balance').textContent = formatCurrency(pendingBalance);
+            document.getElementById('kpi-customer-balance').textContent = formatCurrency(data.customer_total_balance); // Preenche novo quadro
             
             document.getElementById('kpi-orders-count').textContent = completedKpis.orders_count || 0;
             document.getElementById('kpi-paid-orders-count').textContent = completedKpis.paid_orders_count || 0;
             document.getElementById('pending-orders-count').textContent = data.pending_orders.length;
 
-            // 2. Preenche os KPIs de pedidos em ABERTO
-            const openKpis = data.open_orders_kpis;
-            document.getElementById('kpi-total-open-count').textContent = openKpis.total_open_count || 0;
-            document.getElementById('kpi-total-open-value').textContent = formatCurrency(openKpis.total_open_value);
-            document.getElementById('kpi-open-unpaid-count').textContent = openKpis.open_and_unpaid_count || 0;
-            document.getElementById('kpi-open-unpaid-value').textContent = formatCurrency(openKpis.open_and_unpaid_value);
-            document.getElementById('kpi-open-paid-count').textContent = openKpis.open_and_paid_count || 0;
-            document.getElementById('kpi-open-paid-value').textContent = formatCurrency(openKpis.open_and_paid_value);
+            // 2. Preenche a Visão Operacional (Estoque)
+            const stock = data.stock_summary;
+            const inProgress = stock.EM_EXECUCAO;
+            const awaitingDelivery = stock.AGUARDANDO_ENTREGA;
+            const awaitingPickup = stock.AGUARDANDO_RETIRADA;
+
+            // Painel Em Execução
+            document.getElementById('stock-inprogress-total-value').textContent = formatCurrency(inProgress.total_value);
+            document.getElementById('stock-inprogress-total-count').textContent = inProgress.total_count || 0;
+            document.getElementById('stock-inprogress-paid-value').textContent = formatCurrency(inProgress.paid_value);
+            document.getElementById('stock-inprogress-paid-count').textContent = inProgress.paid_count || 0;
+            document.getElementById('stock-inprogress-unpaid-value').textContent = formatCurrency(inProgress.unpaid_value);
+            document.getElementById('stock-inprogress-unpaid-count').textContent = inProgress.unpaid_count || 0;
+            
+            // Painel Aguardando Entrega
+            document.getElementById('stock-delivery-total-value').textContent = formatCurrency(awaitingDelivery.total_value);
+            document.getElementById('stock-delivery-total-count').textContent = awaitingDelivery.total_count || 0;
+            document.getElementById('stock-delivery-paid-value').textContent = formatCurrency(awaitingDelivery.paid_value);
+            document.getElementById('stock-delivery-paid-count').textContent = awaitingDelivery.paid_count || 0;
+            document.getElementById('stock-delivery-unpaid-value').textContent = formatCurrency(awaitingDelivery.unpaid_value);
+            document.getElementById('stock-delivery-unpaid-count').textContent = awaitingDelivery.unpaid_count || 0;
+
+            // Painel Aguardando Retirada
+            document.getElementById('stock-pickup-total-value').textContent = formatCurrency(awaitingPickup.total_value);
+            document.getElementById('stock-pickup-total-count').textContent = awaitingPickup.total_count || 0;
+            document.getElementById('stock-pickup-paid-value').textContent = formatCurrency(awaitingPickup.paid_value);
+            document.getElementById('stock-pickup-paid-count').textContent = awaitingPickup.paid_count || 0;
+            document.getElementById('stock-pickup-unpaid-value').textContent = formatCurrency(awaitingPickup.unpaid_value);
+            document.getElementById('stock-pickup-unpaid-count').textContent = awaitingPickup.unpaid_count || 0;
+
+            // NOVO: Calcula e preenche o painel Totalizador de Estoque
+            const totalStockCount = inProgress.total_count + awaitingDelivery.total_count + awaitingPickup.total_count;
+            const totalStockValue = inProgress.total_value + awaitingDelivery.total_value + awaitingPickup.total_value;
+            const totalPaidCount = inProgress.paid_count + awaitingDelivery.paid_count + awaitingPickup.paid_count;
+            const totalPaidValue = inProgress.paid_value + awaitingDelivery.paid_value + awaitingPickup.paid_value;
+            const totalUnpaidCount = inProgress.unpaid_count + awaitingDelivery.unpaid_count + awaitingPickup.unpaid_count;
+            const totalUnpaidValue = inProgress.unpaid_value + awaitingDelivery.unpaid_value + awaitingPickup.unpaid_value;
+
+            document.getElementById('stock-total-value').textContent = formatCurrency(totalStockValue);
+            document.getElementById('stock-total-count').textContent = totalStockCount;
+            document.getElementById('stock-total-paid-value').textContent = formatCurrency(totalPaidValue);
+            document.getElementById('stock-total-paid-count').textContent = totalPaidCount;
+            document.getElementById('stock-total-unpaid-value').textContent = formatCurrency(totalUnpaidValue);
+            document.getElementById('stock-total-unpaid-count').textContent = totalUnpaidCount;
 
             // 3. Preenche a tabela de Pedidos Pendentes com totalizadores
             const pendingTableBody = document.querySelector('#pending-orders-table tbody');
@@ -142,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateView() {
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
-        const customerId = customerFilter.value; // Pega o valor do novo filtro
+        const customerId = customerFilter.value;
         fetchFinancialData(startDate, endDate, customerId);
     }
     
@@ -151,11 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
     clearButton.addEventListener('click', () => {
         startDateInput.value = '';
         endDateInput.value = '';
-        customerFilter.value = ''; // Limpa também o filtro de cliente
+        customerFilter.value = '';
         updateView();
     });
 
     // Carga inicial
-    populateCustomerFilter(); // Popula o select de clientes
-    updateView(); // Faz a primeira busca de dados
+    populateCustomerFilter();
+    updateView();
 });

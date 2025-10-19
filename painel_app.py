@@ -458,17 +458,29 @@ def customer_reports_page():
     return render_template('customers_report.html')
 
 # --- ROTAS DE ANÁLISE RFM ---
+# painel_app.py
 @app.route('/api/reports/rfm-analysis')
 def get_rfm_analysis_data():
     """
-    Calcula a segmentação RFM (Recency, Frequency, Monetary) dos clientes.
+    Calcula a segmentação RFM, os limites de pontuação e retorna as definições de segmento.
     """
     end_date_str = request.args.get('end_date', date.today().strftime('%Y-%m-%d'))
+    start_date_str = request.args.get('start_date')
+
+    params = [end_date_str + 'T23:59:59'] 
+    
+    where_clauses = ["DATE(o.created_at) <= ?"]
+    params.append(end_date_str)
+
+    if start_date_str:
+        where_clauses.append("DATE(o.created_at) >= ?")
+        params.append(start_date_str)
+
+    where_clause_str = " AND ".join(where_clauses)
     
     conn = get_db_connection()
-    query = """
+    main_query = f"""
         WITH CustomerMetrics AS (
-            -- 1. Calcula Recência, Frequência e Valor Monetário para cada cliente
             SELECT
                 c.customer_id,
                 c.name as customer_name,
@@ -477,67 +489,73 @@ def get_rfm_analysis_data():
                 SUM(o.total_amount) as monetary
             FROM customers c
             JOIN orders o ON c.customer_id = o.customer_id
-            WHERE DATE(o.created_at) <= ?
+            WHERE {where_clause_str}
             GROUP BY c.customer_id, c.name
         ),
         RFMScores AS (
-            -- 2. Atribui scores de 1 a 5 para cada métrica (quintiles)
             SELECT
-                customer_id,
-                customer_name,
-                recency,
-                frequency,
-                monetary,
+                *,
                 NTILE(5) OVER (ORDER BY recency DESC) as r_score,
                 NTILE(5) OVER (ORDER BY frequency ASC) as f_score,
                 NTILE(5) OVER (ORDER BY monetary ASC) as m_score
             FROM CustomerMetrics
-        ),
-        RFMSegments AS (
-            -- 3. Concatena os scores e define o segmento do cliente
-            SELECT
-                *,
-                (r_score || f_score || m_score) as rfm_score
-            FROM RFMScores
         )
-        -- 4. Classifica cada cliente em um segmento com base no score
         SELECT
-            customer_id,
-            customer_name,
-            recency,
-            frequency,
-            monetary,
-            rfm_score,
-            CASE
-                WHEN rfm_score IN ('555', '554', '545', '455', '544') THEN 'Campeões'
-                WHEN rfm_score IN ('543', '444', '435', '355', '354', '345') THEN 'Clientes Leais'
-                WHEN rfm_score IN ('553', '551', '552', '533', '452', '451', '442', '441', '433', '432', '352', '351') THEN 'Potenciais Legalistas'
-                WHEN rfm_score IN ('512', '511', '422', '421', '412', '411', '311') THEN 'Novos Clientes'
-                WHEN rfm_score IN ('525', '524', '523', '532', '531', '425', '424', '423', '431', '315', '314', '313') THEN 'Promissores'
-                WHEN rfm_score IN ('522', '521', '515', '514', '513', '422', '415', '414', '413', '331', '321') THEN 'Precisam de Atenção'
-                WHEN rfm_score IN ('255', '254', '245', '235', '234', '155', '154', '145') THEN 'Em Risco'
-                WHEN rfm_score IN ('133', '132', '123', '122', '233', '232', '223', '222') THEN 'Hibernando'
-                ELSE 'Clientes Perdidos'
-            END as segment
-        FROM RFMSegments
-        ORDER BY recency ASC;
+            *,
+            (r_score || f_score || m_score) as rfm_score
+        FROM RFMScores
     """
     
-    customers_raw = conn.execute(query, [end_date_str + 'T23:59:59', end_date_str]).fetchall()
-    conn.close()
-    
-    # Agrupa os clientes por segmento para a resposta da API
-    segments = {
-        'Campeões': [], 'Clientes Leais': [], 'Potenciais Legalistas': [],
-        'Novos Clientes': [], 'Promissores': [], 'Precisam de Atenção': [],
-        'Em Risco': [], 'Hibernando': [], 'Clientes Perdidos': []
+    rfm_data = conn.execute(main_query, params).fetchall()
+
+    score_boundaries = { 'recency': {}, 'frequency': {}, 'monetary': {} }
+    if rfm_data:
+        data_list = [dict(row) for row in rfm_data]
+        
+        for metric in ['recency', 'frequency', 'monetary']:
+            score_col = f'{metric[0]}_score'
+            for score in range(1, 6):
+                values_for_score = [d[metric] for d in data_list if d[score_col] == score]
+                if values_for_score:
+                    score_boundaries[metric][score] = {
+                        'min': min(values_for_score),
+                        'max': max(values_for_score),
+                        # --- ALTERAÇÃO AQUI: Adiciona a contagem de clientes ---
+                        'count': len(values_for_score) 
+                    }
+
+    segment_definitions = {
+        'Campeões': { 'description': 'Compraram recentemente, compram com frequência e gastam muito. Seus melhores clientes!', 'color': '#28a745', 'scores': ['555', '554', '545', '544', '455', '454', '445'] },
+        'Clientes Leais': { 'description': 'Compram com frequência e respondem bem a promoções. Base sólida de clientes.', 'color': '#20c997', 'scores': ['543', '534', '454', '444', '435', '355', '354', '345', '344', '335'] },
+        'Potenciais Legalistas': { 'description': 'Compradores recentes com frequência média. Podem se tornar leais com um empurrãozinho.', 'color': '#17a2b8', 'scores': ['553', '551', '552', '535', '533', '452', '451', '442', '441', '433', '432', '423', '352', '351', '342', '341', '333', '323'] },
+        'Novos Clientes': { 'description': 'Fizeram sua primeira compra recentemente. Precisam de atenção para voltarem.', 'color': '#007bff', 'scores': ['512', '511', '422', '421', '412', '411', '311'] },
+        'Promissores': { 'description': 'Compradores recentes, mas que não gastaram muito. Potencial a ser desenvolvido.', 'color': '#6f42c1', 'scores': ['525', '524', '523', '532', '531', '425', '424', '431', '423', '315', '314', '313'] },
+        'Precisam de Atenção': { 'description': 'Recência e frequência abaixo da média. Podem ser reativados com ofertas.', 'color': '#ffc107', 'scores': ['522', '521', '515', '514', '513', '422', '415', '414', '413', '331', '321', '312', '221', '213'] },
+        'Em Risco': { 'description': 'Compraram com frequência e gastaram bem, mas não voltam há algum tempo.', 'color': '#fd7e14', 'scores': ['255', '254', '245', '244', '253', '235', '234', '155', '154', '145', '144', '135', '134', '125'] },
+        'Hibernando': { 'description': 'Última compra foi há muito tempo. Baixa frequência e valor. Podem ser perdidos.', 'color': '#dc3545', 'scores': ['332', '322', '233', '232', '223', '222', '212', '133', '132', '123', '122'] },
+        'Clientes Perdidos': { 'description': 'Seus piores clientes. Não compram há muito, muito tempo.', 'color': '#6c757d', 'scores': ['111', '112', '121', '131', '141', '151', '211', '221'] }
     }
-    for row in customers_raw:
-        segment_name = row['segment']
-        if segment_name in segments:
-            segments[segment_name].append(dict(row))
+
+    score_to_segment = {score: segment for segment, data in segment_definitions.items() for score in data['scores']}
+    segments_data = {name: [] for name in segment_definitions.keys()}
+    segments_data['Não Mapeado'] = []
+
+    for row in rfm_data:
+        score = row['rfm_score']
+        segment_name = score_to_segment.get(score, 'Não Mapeado')
+        segments_data[segment_name].append(dict(row))
+    
+    for segment in segments_data.values():
+        segment.sort(key=lambda x: x['rfm_score'], reverse=True)
+
+    conn.close()
             
-    return jsonify(segments)
+    return jsonify({
+        'segments': segments_data,
+        'score_boundaries': score_boundaries,
+        'segment_definitions': segment_definitions
+    })
+
 
 @app.route('/rfm_analysis')
 def rfm_analysis_page():

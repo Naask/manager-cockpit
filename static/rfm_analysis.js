@@ -1,21 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const filterButton = document.getElementById('filter-button');
     const segmentsContainer = document.getElementById('segments-container');
     const loadingMessage = document.getElementById('loading-message');
-
-    // Define os segmentos e suas descrições
-    const segmentDefinitions = {
-        'Campeões': { description: 'Compraram recentemente, compram com frequência e gastam muito. Seus melhores clientes!', color: '#28a745' },
-        'Clientes Leais': { description: 'Compram com frequência e respondem bem a promoções. Base sólida de clientes.', color: '#20c997' },
-        'Potenciais Legalistas': { description: 'Compradores recentes com frequência média. Podem se tornar leais com um empurrãozinho.', color: '#17a2b8' },
-        'Novos Clientes': { description: 'Fizeram sua primeira compra recentemente. Precisam de atenção para voltarem.', color: '#007bff' },
-        'Promissores': { description: 'Compradores recentes, mas que não gastaram muito. Potencial a ser desenvolvido.', color: '#6f42c1' },
-        'Precisam de Atenção': { description: 'Recência e frequência abaixo da média. Podem ser reativados com ofertas.', color: '#ffc107' },
-        'Em Risco': { description: 'Compraram com frequência e gastaram bem, mas não voltam há algum tempo.', color: '#fd7e14' },
-        'Hibernando': { description: 'Última compra foi há muito tempo. Baixa frequência e valor. Podem ser perdidos.', color: '#dc3545' },
-        'Clientes Perdidos': { description: 'Seus piores clientes. Não compram há muito, muito tempo.', color: '#6c757d' }
-    };
+    const legendContainer = document.getElementById('score-legend-container');
 
     function formatCurrency(amountInCents) {
         if (amountInCents === null || amountInCents === undefined) return 'R$ 0,00';
@@ -23,42 +12,84 @@ document.addEventListener('DOMContentLoaded', () => {
         return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    async function fetchAndRenderRFM(endDate) {
+    function renderScoreLegend(boundaries) {
+        // --- FUNÇÃO AUXILIAR ATUALIZADA ---
+        const getRange = (metric, score) => {
+            const boundary = boundaries?.[metric]?.[score];
+            if (!boundary) {
+                return 'N/A';
+            }
+            
+            // Constrói a string do intervalo
+            let rangeStr;
+            if (metric === 'monetary') {
+                rangeStr = `${formatCurrency(boundary.min)} - ${formatCurrency(boundary.max)}`;
+            } else {
+                rangeStr = `${boundary.min} - ${boundary.max}`;
+            }
+            
+            // Adiciona a contagem de clientes
+            return `${rangeStr} <br><small>(${boundary.count} clientes)</small>`;
+        };
+
+        if (!boundaries || Object.keys(boundaries.recency).length === 0) {
+            legendContainer.innerHTML = '';
+            return;
+        }
+
+        legendContainer.innerHTML = `
+            <h2>Critérios de Pontuação (Baseado na Amostra)</h2>
+            <table class="legend-table">
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th>Score 1 (Pior)</th>
+                        <th>Score 2</th>
+                        <th>Score 3</th>
+                        <th>Score 4</th>
+                        <th>Score 5 (Melhor)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="metric-col">Recência (dias)</td><td>${getRange('recency', 1)}</td><td>${getRange('recency', 2)}</td><td>${getRange('recency', 3)}</td><td>${getRange('recency', 4)}</td><td>${getRange('recency', 5)}</td></tr>
+                    <tr><td class="metric-col">Frequência (pedidos)</td><td>${getRange('frequency', 1)}</td><td>${getRange('frequency', 2)}</td><td>${getRange('frequency', 3)}</td><td>${getRange('frequency', 4)}</td><td>${getRange('frequency', 5)}</td></tr>
+                    <tr><td class="metric-col">Valor (R$)</td><td>${getRange('monetary', 1)}</td><td>${getRange('monetary', 2)}</td><td>${getRange('monetary', 3)}</td><td>${getRange('monetary', 4)}</td><td>${getRange('monetary', 5)}</td></tr>
+                </tbody>
+            </table>`;
+    }
+
+    async function fetchAndRenderRFM(startDate, endDate) {
         loadingMessage.style.display = 'block';
         segmentsContainer.innerHTML = '';
+        legendContainer.innerHTML = '';
 
         try {
-            let url = '/api/reports/rfm-analysis';
-            if (endDate) {
-                url += `?end_date=${endDate}`;
-            }
+            const params = new URLSearchParams();
+            if (endDate) params.append('end_date', endDate);
+            if (startDate) params.append('start_date', startDate);
 
+            const url = `/api/reports/rfm-analysis?${params.toString()}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Erro na API: ${response.statusText}`);
             
-            const segments = await response.json();
+            const data = await response.json();
+            const segments = data.segments;
+            const segmentDefinitions = data.segment_definitions;
 
-            // Limpa o container e renderiza os novos cards
-            segmentsContainer.innerHTML = '';
+            renderScoreLegend(data.score_boundaries);
             
+            segmentsContainer.innerHTML = '';
             for (const segmentName in segmentDefinitions) {
                 const customers = segments[segmentName] || [];
                 const definition = segmentDefinitions[segmentName];
 
-                let tableRows = '<tr><th>Cliente</th><th>Recência (dias)</th><th>Frequência</th><th>Valor</th></tr>';
+                let tableRows = '<tr><th>Cliente</th><th>Score</th><th>Recência (d)</th><th>Frequência</th><th>Valor</th></tr>';
                 if (customers.length > 0) {
                     customers.forEach(c => {
-                        tableRows += `
-                            <tr>
-                                <td>${c.customer_name}</td>
-                                <td>${c.recency}</td>
-                                <td>${c.frequency}</td>
-                                <td>${formatCurrency(c.monetary)}</td>
-                            </tr>
-                        `;
+                        tableRows += `<tr><td>${c.customer_name}</td><td>${c.rfm_score}</td><td>${c.recency}</td><td>${c.frequency}</td><td>${formatCurrency(c.monetary)}</td></tr>`;
                     });
                 } else {
-                    tableRows = '<tr><td colspan="4">Nenhum cliente neste segmento.</td></tr>';
+                    tableRows = '<tr><td colspan="5">Nenhum cliente neste segmento.</td></tr>';
                 }
 
                 const cardHTML = `
@@ -66,6 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="segment-header">
                             <h3>${segmentName} (${customers.length})</h3>
                             <p>${definition.description}</p>
+                            <div class="score-list">
+                                <b>Scores:</b> ${definition.scores.join(', ')}
+                            </div>
                         </div>
                         <div class="segment-body">
                             <table class="customer-table">
@@ -85,13 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Define a data de hoje como padrão no input
-    endDateInput.value = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(today.getDate() - 90);
+
+    endDateInput.value = today.toISOString().split('T')[0];
+    startDateInput.value = ninetyDaysAgo.toISOString().split('T')[0];
 
     filterButton.addEventListener('click', () => {
-        fetchAndRenderRFM(endDateInput.value);
+        fetchAndRenderRFM(startDateInput.value, endDateInput.value);
     });
 
-    // Carga inicial
-    fetchAndRenderRFM(endDateInput.value);
+    fetchAndRenderRFM(startDateInput.value, endDateInput.value);
 });

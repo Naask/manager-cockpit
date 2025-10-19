@@ -12,23 +12,26 @@
         .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
         .controls-container button { padding: 0.6rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
-        .segments-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 1.5rem;
-        }
-        .segment-card {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-top: 5px solid #fd7e14;
-        }
+        .legend-container { background-color: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .legend-container h2 { margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; }
+        .legend-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .legend-table th, .legend-table td { padding: 0.75rem; border: 1px solid #dee2e6; }
+        .legend-table th { background-color: #f8f9fa; }
+        .legend-table .metric-col { text-align: left; font-weight: bold; }
+
+        .segments-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
+        .segment-card { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-top: 5px solid #fd7e14; }
         .segment-header { padding: 1rem; border-bottom: 1px solid #e9ecef; }
         .segment-header h3 { margin: 0; font-size: 1.2rem; }
         .segment-header p { margin: 0.25rem 0 0; color: #6c757d; font-size: 0.9rem; }
+        /* --- ESTILO PARA A LISTA DE SCORES --- */
+        .score-list { font-size: 0.75rem; color: #6c757d; margin-top: 0.5rem; word-wrap: break-word; }
+        .score-list b { color: #343a40; }
+
         .segment-body { padding: 1rem; }
         .customer-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .customer-table th, .customer-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e9ecef; }
+        .customer-table th:nth-child(2), .customer-table td:nth-child(2) { text-align: center; font-weight: bold; }
         #loading-message { text-align: center; font-size: 1.2rem; padding: 2rem; }
     </style>
 </head>
@@ -36,13 +39,17 @@
     <header><h1>Análise RFM (Recência, Frequência, Valor Monetário)</h1></header>
     <main>
         <div class="controls-container">
-            <label for="end-date">Analisar até a data:</label>
+            <label for="start-date">De:</label>
+            <input type="date" id="start-date">
+            <label for="end-date">Até:</label>
             <input type="date" id="end-date">
             <button id="filter-button">Analisar</button>
         </div>
+
+        <div class="legend-container" id="score-legend-container"></div>
+
         <div id="loading-message"><p>Calculando segmentos de clientes...</p></div>
-        <div class="segments-grid" id="segments-container">
-            </div>
+        <div class="segments-grid" id="segments-container"></div>
     </main>
     <script src="/static/rfm_analysis.js"></script>
 </body>

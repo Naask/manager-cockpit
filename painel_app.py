@@ -2,6 +2,7 @@
 # Servidor Flask para os Cockpits de Operação e Gestão.
 import sqlite3
 from flask import Flask, jsonify, render_template, request
+from datetime import date
 
 app = Flask(__name__)
 
@@ -391,6 +392,9 @@ def product_reports_page():
 
 
 # --- ROTAS DE ANÁLISE DE CLIENTES ---
+# painel_app.py
+
+# --- ROTAS DE ANÁLISE DE CLIENTES ---
 @app.route('/api/reports/customer-performance')
 def get_customer_performance_data():
     start_date = request.args.get('start_date')
@@ -400,12 +404,27 @@ def get_customer_performance_data():
     if start_date and end_date:
         where_clause = "WHERE o.created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-    query = f"SELECT c.name as customer_name, SUM(o.total_amount) as total_revenue, COUNT(o.order_id) as order_count FROM orders o JOIN customers c ON o.customer_id = c.customer_id {where_clause} GROUP BY c.customer_id, c.name ORDER BY total_revenue DESC;"
+    
+    # --- CORREÇÃO APLICADA AQUI ---
+    # A query foi ajustada para selecionar também o "c.customer_id".
+    query = f"""
+        SELECT 
+            c.customer_id, 
+            c.name as customer_name, 
+            SUM(o.total_amount) as total_revenue, 
+            COUNT(o.order_id) as order_count 
+        FROM orders o 
+        JOIN customers c ON o.customer_id = c.customer_id 
+        {where_clause} 
+        GROUP BY c.customer_id, c.name 
+        ORDER BY total_revenue DESC;
+    """
     conn = get_db_connection()
     customer_data = conn.execute(query, params).fetchall()
     grand_total_revenue = sum(row['total_revenue'] for row in customer_data)
     conn.close()
     return jsonify({'customers': [dict(row) for row in customer_data], 'grand_total_revenue': grand_total_revenue or 0})
+
 
 @app.route('/api/reports/customer-concentration-trend')
 def get_customer_concentration_trend():
@@ -437,6 +456,144 @@ def get_customer_concentration_trend():
 @app.route('/customers_report')
 def customer_reports_page():
     return render_template('customers_report.html')
+
+# --- ROTAS DE ANÁLISE RFM ---
+@app.route('/api/reports/rfm-analysis')
+def get_rfm_analysis_data():
+    """
+    Calcula a segmentação RFM (Recency, Frequency, Monetary) dos clientes.
+    """
+    end_date_str = request.args.get('end_date', date.today().strftime('%Y-%m-%d'))
+    
+    conn = get_db_connection()
+    query = """
+        WITH CustomerMetrics AS (
+            -- 1. Calcula Recência, Frequência e Valor Monetário para cada cliente
+            SELECT
+                c.customer_id,
+                c.name as customer_name,
+                CAST(JULIANDAY(?) - JULIANDAY(MAX(o.created_at)) AS INTEGER) as recency,
+                COUNT(DISTINCT o.order_id) as frequency,
+                SUM(o.total_amount) as monetary
+            FROM customers c
+            JOIN orders o ON c.customer_id = o.customer_id
+            WHERE DATE(o.created_at) <= ?
+            GROUP BY c.customer_id, c.name
+        ),
+        RFMScores AS (
+            -- 2. Atribui scores de 1 a 5 para cada métrica (quintiles)
+            SELECT
+                customer_id,
+                customer_name,
+                recency,
+                frequency,
+                monetary,
+                NTILE(5) OVER (ORDER BY recency DESC) as r_score,
+                NTILE(5) OVER (ORDER BY frequency ASC) as f_score,
+                NTILE(5) OVER (ORDER BY monetary ASC) as m_score
+            FROM CustomerMetrics
+        ),
+        RFMSegments AS (
+            -- 3. Concatena os scores e define o segmento do cliente
+            SELECT
+                *,
+                (r_score || f_score || m_score) as rfm_score
+            FROM RFMScores
+        )
+        -- 4. Classifica cada cliente em um segmento com base no score
+        SELECT
+            customer_id,
+            customer_name,
+            recency,
+            frequency,
+            monetary,
+            rfm_score,
+            CASE
+                WHEN rfm_score IN ('555', '554', '545', '455', '544') THEN 'Campeões'
+                WHEN rfm_score IN ('543', '444', '435', '355', '354', '345') THEN 'Clientes Leais'
+                WHEN rfm_score IN ('553', '551', '552', '533', '452', '451', '442', '441', '433', '432', '352', '351') THEN 'Potenciais Legalistas'
+                WHEN rfm_score IN ('512', '511', '422', '421', '412', '411', '311') THEN 'Novos Clientes'
+                WHEN rfm_score IN ('525', '524', '523', '532', '531', '425', '424', '423', '431', '315', '314', '313') THEN 'Promissores'
+                WHEN rfm_score IN ('522', '521', '515', '514', '513', '422', '415', '414', '413', '331', '321') THEN 'Precisam de Atenção'
+                WHEN rfm_score IN ('255', '254', '245', '235', '234', '155', '154', '145') THEN 'Em Risco'
+                WHEN rfm_score IN ('133', '132', '123', '122', '233', '232', '223', '222') THEN 'Hibernando'
+                ELSE 'Clientes Perdidos'
+            END as segment
+        FROM RFMSegments
+        ORDER BY recency ASC;
+    """
+    
+    customers_raw = conn.execute(query, [end_date_str + 'T23:59:59', end_date_str]).fetchall()
+    conn.close()
+    
+    # Agrupa os clientes por segmento para a resposta da API
+    segments = {
+        'Campeões': [], 'Clientes Leais': [], 'Potenciais Legalistas': [],
+        'Novos Clientes': [], 'Promissores': [], 'Precisam de Atenção': [],
+        'Em Risco': [], 'Hibernando': [], 'Clientes Perdidos': []
+    }
+    for row in customers_raw:
+        segment_name = row['segment']
+        if segment_name in segments:
+            segments[segment_name].append(dict(row))
+            
+    return jsonify(segments)
+
+@app.route('/rfm_analysis')
+def rfm_analysis_page():
+    return render_template('rfm_analysis.html')
+
+# --- ROTAS DE EXTRATO DE CLIENTE ---
+@app.route('/api/reports/customer-statement/<customer_id>')
+def get_customer_statement(customer_id):
+    """
+    Busca o extrato de transações e o saldo de um cliente específico.
+    """
+    conn = get_db_connection()
+    
+    # Busca informações do cliente e seu saldo calculado
+    customer_info_query = """
+        SELECT
+            c.name,
+            c.phone,
+            c.email,
+            (SELECT SUM(CASE 
+                WHEN lt.transaction_type IN ('PAYMENT_RECEIVED', 'BONUS_ADDED', 'BALANCE_CORRECTION_CREDIT') THEN lt.amount
+                ELSE -lt.amount 
+            END) FROM ledger_transactions lt WHERE lt.customer_id = c.customer_id) as current_balance
+        FROM customers c
+        WHERE c.customer_id = ?;
+    """
+    customer = conn.execute(customer_info_query, [customer_id]).fetchone()
+    
+    # Busca todas as transações do ledger para o cliente
+    transactions_query = """
+        SELECT
+            transaction_id,
+            timestamp,
+            transaction_type,
+            description,
+            amount
+        FROM ledger_transactions
+        WHERE customer_id = ?
+        ORDER BY timestamp DESC;
+    """
+    transactions = conn.execute(transactions_query, [customer_id]).fetchall()
+    
+    conn.close()
+    
+    if not customer:
+        return jsonify({'error': 'Cliente não encontrado'}), 404
+        
+    return jsonify({
+        'customer_info': dict(customer),
+        'transactions': [dict(row) for row in transactions]
+    })
+
+@app.route('/customer_statement/<customer_id>')
+def customer_statement_page(customer_id):
+    # Passa o customer_id para o template para que o JS possa buscá-lo
+    return render_template('customer_statement.html', customer_id=customer_id)
 
 
 # --- ROTAS DE ANÁLISE DE COORTES ---

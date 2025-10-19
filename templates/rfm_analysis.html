@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise RFM de Clientes - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #fd7e14; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
+        .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls-container label { font-weight: bold; }
+        .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container button { padding: 0.6rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        
+        .segments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        .segment-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-top: 5px solid #fd7e14;
+        }
+        .segment-header { padding: 1rem; border-bottom: 1px solid #e9ecef; }
+        .segment-header h3 { margin: 0; font-size: 1.2rem; }
+        .segment-header p { margin: 0.25rem 0 0; color: #6c757d; font-size: 0.9rem; }
+        .segment-body { padding: 1rem; }
+        .customer-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .customer-table th, .customer-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e9ecef; }
+        #loading-message { text-align: center; font-size: 1.2rem; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <header><h1>Análise RFM (Recência, Frequência, Valor Monetário)</h1></header>
+    <main>
+        <div class="controls-container">
+            <label for="end-date">Analisar até a data:</label>
+            <input type="date" id="end-date">
+            <button id="filter-button">Analisar</button>
+        </div>
+        <div id="loading-message"><p>Calculando segmentos de clientes...</p></div>
+        <div class="segments-grid" id="segments-container">
+            </div>
+    </main>
+    <script src="/static/rfm_analysis.js"></script>
+</body>
+</html>

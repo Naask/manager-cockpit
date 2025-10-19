@@ -41,14 +41,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const paretoPercentage = rankingData.grand_total_revenue > 0 ? (cumulativeRevenue / rankingData.grand_total_revenue) * 100 : 0;
                     const averageTicket = customer.order_count > 0 ? (customer.total_revenue / customer.order_count) : 0;
                     row.innerHTML = `
-                        <td><strong>${index + 1}º</strong></td>
-                        <td>${customer.customer_name}</td>
-                        <td>${formatCurrency(customer.total_revenue)}</td>
-                        <td>${percentageOfTotal.toFixed(2)}%</td>
-                        <td>${paretoPercentage.toFixed(2)}%</td>
-                        <td>${customer.order_count}</td>
-                        <td>${formatCurrency(averageTicket)}</td>
-                    `;
+                    <td><strong>${index + 1}º</strong></td>
+                    <td>${customer.customer_name}</td>
+                    <td>${formatCurrency(customer.total_revenue)}</td>
+                    <td>${percentageOfTotal.toFixed(2)}%</td>
+                    <td>${paretoPercentage.toFixed(2)}%</td>
+                    <td>${customer.order_count}</td>
+                    <td>${formatCurrency(averageTicket)}</td>
+                    <td><a href="/customer_statement/${customer.customer_id}" target="_blank">Ver Extrato</a></td>
+                `;
                 });
             }
         } catch (error) {

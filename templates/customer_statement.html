@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Extrato do Cliente - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #007bff; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; max-width: 900px; margin: 0 auto; }
+        .report-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .customer-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e9ecef; padding-bottom: 1rem; margin-bottom: 1rem; }
+        .customer-header h1 { margin: 0; }
+        .customer-balance { text-align: right; }
+        .customer-balance span { display: block; color: #6c757d; }
+        .customer-balance strong { font-size: 1.5rem; color: #28a745; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
+        th { background-color: #f8f9fa; }
+        .credit { color: #28a745; font-weight: bold; }
+        .debit { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <header><h1>Extrato de Movimentações</h1></header>
+    <main>
+        <div class="report-container">
+            <div id="customer-info-container">
+                <p>Carregando dados do cliente...</p>
+            </div>
+            <table id="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Tipo de Transação</th>
+                        <th>Descrição</th>
+                        <th>Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+    </main>
+    <script id="customer-data" type="application/json">
+        { "customer_id": "{{ customer_id }}" }
+    </script>
+    <script src="/static/customer_statement.js"></script>
+</body>
+</html>

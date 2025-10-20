@@ -13,14 +13,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderScoreLegend(boundaries) {
-        // --- FUNÇÃO AUXILIAR ATUALIZADA ---
         const getRange = (metric, score) => {
             const boundary = boundaries?.[metric]?.[score];
             if (!boundary) {
                 return 'N/A';
             }
             
-            // Constrói a string do intervalo
             let rangeStr;
             if (metric === 'monetary') {
                 rangeStr = `${formatCurrency(boundary.min)} - ${formatCurrency(boundary.max)}`;
@@ -28,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 rangeStr = `${boundary.min} - ${boundary.max}`;
             }
             
-            // Adiciona a contagem de clientes
             return `${rangeStr} <br><small>(${boundary.count} clientes)</small>`;
         };
 
@@ -75,11 +72,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             const segments = data.segments;
             const segmentDefinitions = data.segment_definitions;
+            // --- ALTERAÇÃO AQUI: Usa a nova lista de ordem explícita ---
+            const segmentOrder = data.segment_order;
 
             renderScoreLegend(data.score_boundaries);
             
             segmentsContainer.innerHTML = '';
-            for (const segmentName in segmentDefinitions) {
+            
+            // O ciclo agora itera sobre a lista 'segmentOrder', que tem a ordem garantida.
+            for (const segmentName of segmentOrder) {
                 const customers = segments[segmentName] || [];
                 const definition = segmentDefinitions[segmentName];
 

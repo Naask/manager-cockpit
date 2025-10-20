@@ -459,10 +459,11 @@ def customer_reports_page():
 
 # --- ROTAS DE ANÁLISE RFM ---
 # painel_app.py
+
 @app.route('/api/reports/rfm-analysis')
 def get_rfm_analysis_data():
     """
-    Calcula a segmentação RFM, os limites de pontuação e retorna as definições de segmento.
+    Calcula a segmentação RFM e retorna a ordem explícita dos segmentos.
     """
     end_date_str = request.args.get('end_date', date.today().strftime('%Y-%m-%d'))
     start_date_str = request.args.get('start_date')
@@ -520,31 +521,48 @@ def get_rfm_analysis_data():
                     score_boundaries[metric][score] = {
                         'min': min(values_for_score),
                         'max': max(values_for_score),
-                        # --- ALTERAÇÃO AQUI: Adiciona a contagem de clientes ---
                         'count': len(values_for_score) 
                     }
 
     segment_definitions = {
-        'Campeões': { 'description': 'Compraram recentemente, compram com frequência e gastam muito. Seus melhores clientes!', 'color': '#28a745', 'scores': ['555', '554', '545', '544', '455', '454', '445'] },
-        'Clientes Leais': { 'description': 'Compram com frequência e respondem bem a promoções. Base sólida de clientes.', 'color': '#20c997', 'scores': ['543', '534', '454', '444', '435', '355', '354', '345', '344', '335'] },
-        'Potenciais Legalistas': { 'description': 'Compradores recentes com frequência média. Podem se tornar leais com um empurrãozinho.', 'color': '#17a2b8', 'scores': ['553', '551', '552', '535', '533', '452', '451', '442', '441', '433', '432', '423', '352', '351', '342', '341', '333', '323'] },
-        'Novos Clientes': { 'description': 'Fizeram sua primeira compra recentemente. Precisam de atenção para voltarem.', 'color': '#007bff', 'scores': ['512', '511', '422', '421', '412', '411', '311'] },
-        'Promissores': { 'description': 'Compradores recentes, mas que não gastaram muito. Potencial a ser desenvolvido.', 'color': '#6f42c1', 'scores': ['525', '524', '523', '532', '531', '425', '424', '431', '423', '315', '314', '313'] },
-        'Precisam de Atenção': { 'description': 'Recência e frequência abaixo da média. Podem ser reativados com ofertas.', 'color': '#ffc107', 'scores': ['522', '521', '515', '514', '513', '422', '415', '414', '413', '331', '321', '312', '221', '213'] },
-        'Em Risco': { 'description': 'Compraram com frequência e gastaram bem, mas não voltam há algum tempo.', 'color': '#fd7e14', 'scores': ['255', '254', '245', '244', '253', '235', '234', '155', '154', '145', '144', '135', '134', '125'] },
-        'Hibernando': { 'description': 'Última compra foi há muito tempo. Baixa frequência e valor. Podem ser perdidos.', 'color': '#dc3545', 'scores': ['332', '322', '233', '232', '223', '222', '212', '133', '132', '123', '122'] },
-        'Clientes Perdidos': { 'description': 'Seus piores clientes. Não compram há muito, muito tempo.', 'color': '#6c757d', 'scores': ['111', '112', '121', '131', '141', '151', '211', '221'] }
+        'Campeões': { 'description': 'Elite (R≥4, F≥5, M≥4).', 'color': '#28a745', 'scores': [] },
+        'Em Risco': { 'description': 'Eram muito frequentes, agora inativos (F≥4, R≤2).', 'color': '#fd7e14', 'scores': [] },
+        'Clientes Leais': { 'description': 'Alta frequência (F≥4).', 'color': '#20c997', 'scores': [] },
+        'Novos': { 'description': 'Muito recentes, baixa frequência (R≥4, F≤2).', 'color': '#007bff', 'scores': [] },
+        'Potenciais': { 'description': 'Ativos e com boa frequência (R≥3, F≥3).', 'color': '#6f42c1', 'scores': [] },
+        'Perdidos': { 'description': 'Clientes com baixa atividade geral.', 'color': '#6c757d', 'scores': [] }
     }
-
-    score_to_segment = {score: segment for segment, data in segment_definitions.items() for score in data['scores']}
-    segments_data = {name: [] for name in segment_definitions.keys()}
-    segments_data['Não Mapeado'] = []
-
-    for row in rfm_data:
-        score = row['rfm_score']
-        segment_name = score_to_segment.get(score, 'Não Mapeado')
-        segments_data[segment_name].append(dict(row))
     
+    # --- ALTERAÇÃO AQUI: Define a ordem explícita dos painéis ---
+    segment_order = ['Campeões', 'Em Risco', 'Clientes Leais', 'Novos', 'Potenciais', 'Perdidos']
+
+    segments_data = {name: [] for name in segment_definitions.keys()}
+    segment_scores = {name: set() for name in segment_definitions.keys()}
+
+    for row_proxy in rfm_data:
+        row = dict(row_proxy)
+        r_score, f_score, m_score = row['r_score'], row['f_score'], row['m_score']
+        segment_name = ''
+
+        if r_score >= 4 and f_score >= 5 and m_score >= 4:
+            segment_name = 'Campeões'
+        elif r_score <= 2 and f_score >= 4:
+            segment_name = 'Em Risco'
+        elif f_score >= 4:
+            segment_name = 'Clientes Leais'
+        elif r_score >= 4 and f_score <= 2:
+            segment_name = 'Novos'
+        elif f_score >= 3 and r_score >= 3:
+            segment_name = 'Potenciais'
+        else:
+            segment_name = 'Perdidos'
+        
+        segments_data[segment_name].append(row)
+        segment_scores[segment_name].add(row['rfm_score'])
+
+    for name, scores in segment_scores.items():
+        segment_definitions[name]['scores'] = sorted(list(scores))
+
     for segment in segments_data.values():
         segment.sort(key=lambda x: x['rfm_score'], reverse=True)
 
@@ -553,9 +571,9 @@ def get_rfm_analysis_data():
     return jsonify({
         'segments': segments_data,
         'score_boundaries': score_boundaries,
-        'segment_definitions': segment_definitions
+        'segment_definitions': segment_definitions,
+        'segment_order': segment_order # Nova chave na resposta
     })
-
 
 @app.route('/rfm_analysis')
 def rfm_analysis_page():

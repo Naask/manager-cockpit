@@ -673,6 +673,110 @@ def get_order_values_data():
     conn.close()
     return jsonify([row['total_amount'] for row in order_values])
 
+# --- ADICIONE ISTO AO painel_app.py ---
+# --- COLAR ISTO NO ARQUIVO painel_app.py (Substituindo a rota anterior) ---
+
+@app.route('/api/reports/evolution-comparison')
+def get_evolution_comparison_data():
+    """
+    Retorna dados acumulados para comparação, consistente com os Relatórios Gerenciais.
+    """
+    period_type = request.args.get('period_type', 'month') 
+    metric = request.args.get('metric', 'revenue') # 'revenue' ou 'orders'
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # 1. Definição do Rótulo do Período (A "Linha" do gráfico)
+    # Mesma lógica do get_reports_summary para garantir os mesmos nomes de agrupamento
+    period_formats = {
+        'week': "strftime('%Y-W%W', created_at)",
+        'month': "strftime('%Y-%m', created_at)",
+        'bimester': "strftime('%Y', created_at) || '-B' || ((strftime('%m', created_at) - 1) / 2 + 1)",
+        'trimester': "strftime('%Y', created_at) || '-Q' || ((strftime('%m', created_at) - 1) / 3 + 1)",
+        'semester': "strftime('%Y', created_at) || '-S' || ((strftime('%m', created_at) - 1) / 6 + 1)",
+        'year': "strftime('%Y', created_at)"
+    }
+    period_label_sql = period_formats.get(period_type, period_formats['month'])
+
+    # 2. Definição do Eixo X (O progresso dentro do período)
+    if period_type == 'week':
+        # Eixo X: Dia da semana (0=Domingo, 6=Sábado)
+        x_axis_sql = "CAST(strftime('%w', created_at) as INTEGER)"
+    elif period_type == 'month':
+        # Eixo X: Dia do mês (1-31)
+        x_axis_sql = "CAST(strftime('%d', created_at) as INTEGER)"
+    elif period_type == 'year':
+        # Eixo X: Mês do ano (1-12)
+        x_axis_sql = "CAST(strftime('%m', created_at) as INTEGER)"
+    elif period_type == 'bimester':
+        # Eixo X: Mês dentro do bimestre (1 ou 2)
+        x_axis_sql = "(CAST(strftime('%m', created_at) as INTEGER) - 1) % 2 + 1"
+    elif period_type == 'trimester':
+        # Eixo X: Mês dentro do trimestre (1 a 3)
+        x_axis_sql = "(CAST(strftime('%m', created_at) as INTEGER) - 1) % 3 + 1"
+    elif period_type == 'semester':
+        # Eixo X: Mês dentro do semestre (1 a 6)
+        x_axis_sql = "(CAST(strftime('%m', created_at) as INTEGER) - 1) % 6 + 1"
+    else:
+        # Fallback para dia do mês
+        x_axis_sql = "CAST(strftime('%d', created_at) as INTEGER)"
+
+    # 3. Construção da Query
+    params = []
+    where_clause = "WHERE created_at IS NOT NULL"
+    
+    if start_date and end_date:
+        where_clause += " AND created_at BETWEEN ? AND ?"
+        params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    query = f"""
+        SELECT 
+            {period_label_sql} as period_label,
+            {x_axis_sql} as time_index,
+            SUM(total_amount) as total_revenue,
+            COUNT(order_id) as total_orders
+        FROM orders
+        {where_clause}
+        GROUP BY 1, 2
+        ORDER BY 1 ASC, 2 ASC;
+    """
+    
+    conn = get_db_connection()
+    raw_data = conn.execute(query, params).fetchall()
+    conn.close()
+
+    # 4. Processamento Python (Acumulado)
+    datasets = {}
+    
+    for row in raw_data:
+        period = row['period_label']
+        if not period: continue # Proteção contra None
+            
+        day_index = row['time_index']
+        val = row['total_revenue'] if metric == 'revenue' else row['total_orders']
+        
+        if period not in datasets:
+            datasets[period] = {
+                'data_points': [],
+                'running_total': 0
+            }
+        
+        datasets[period]['running_total'] += val
+        
+        # Se for receita, converte centavos para Reais
+        final_val = datasets[period]['running_total'] / 100 if metric == 'revenue' else datasets[period]['running_total']
+        
+        datasets[period]['data_points'].append({
+            'x': day_index,
+            'y': final_val
+        })
+    
+    return jsonify(datasets)
+
+@app.route('/evolution_report')
+def evolution_report_page():
+    return render_template('evolution_comparison.html')
+
 
 # --- INICIALIZAÇÃO DO SERVIDOR ---
 if __name__ == '__main__':

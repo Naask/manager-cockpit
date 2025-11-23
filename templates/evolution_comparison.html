@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Evolução Comparativa - Lavanderia</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f6; margin: 0; }
+        header { background-color: #6610f2; color: white; padding: 1rem; text-align: center; }
+        main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+        
+        .controls-container { 
+            background-color: white; padding: 1.5rem; border-radius: 8px; 
+            margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        
+        .filters-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 1rem; 
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        .filter-group label { font-weight: bold; font-size: 0.9rem; color: #495057; }
+        .filter-group select, .filter-group input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; }
+        
+        /* Área de Checkboxes com Scroll */
+        .periods-list-container {
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 0.5rem;
+            background: #fafafa;
+        }
+        .periods-list {
+            max-height: 150px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.5rem;
+        }
+        .period-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; }
+        
+        .buttons-row { display: flex; gap: 1rem; margin-top: 1rem; }
+        button { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        #search-btn { background-color: #28a745; }
+        #update-chart-btn { background-color: #007bff; }
+        #clear-selection-btn { background-color: #6c757d; }
+
+        .chart-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 500px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+</head>
+<body>
+    <header><h1>Comparativo de Evolução Acumulada</h1></header>
+    <main>
+        <div class="controls-container">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="period-type">Agrupar Por:</label>
+                    <select id="period-type">
+                        <option value="month" selected>Mês</option>
+                        <option value="week">Semana</option>
+                        <option value="bimester">Bimestre</option>
+                        <option value="trimester">Trimestre</option>
+                        <option value="semester">Semestre</option>
+                        <option value="year">Ano</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="start-date">De:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="filter-group">
+                    <label for="end-date">Até:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <div class="filter-group">
+                    <label for="metric-selector">Métrica:</label>
+                    <select id="metric-selector">
+                        <option value="revenue">Faturamento Acumulado (R$)</option>
+                        <option value="orders">Qtd. Pedidos Acumulada</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="search-btn">Buscar Períodos</button>
+            
+            <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #e9ecef;">
+
+            <div class="filter-group">
+                <label>Selecione quais períodos exibir no gráfico:</label>
+                <div class="periods-list-container">
+                    <div id="periods-container" class="periods-list">
+                        <p style="color: #6c757d; padding: 0.5rem;">Clique em "Buscar Períodos" para carregar as opções.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="buttons-row">
+                <button id="update-chart-btn">Atualizar Gráfico</button>
+                <button id="clear-selection-btn">Limpar Seleção</button>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="evolutionChart"></canvas>
+        </div>
+    </main>
+    <script src="/static/evolution_comparison.js"></script>
+</body>
+</html>

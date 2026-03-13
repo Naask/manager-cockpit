@@ -1,3 +1,5 @@
-Pre-requisites: Python \n
-Installation: execute -m pip install -r requirements.txt \n
+Pre-requisites: Python
+
+Installation: execute -m pip install -r requirements.txt
+
 Execution: Run "python painel_app.py"

@@ -369,12 +369,28 @@ def reports_page():
 def get_product_performance_data():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    period = request.args.get('period')
     params = []
     where_clause = ""
     if start_date and end_date:
         where_clause = "WHERE o.created_at BETWEEN ? AND ?"
         params.extend([start_date + 'T00:00', end_date + 'T23:59'])
-    query = f"SELECT p.name as product_name, p.category as product_category, SUM(oi.quantity) as total_quantity, SUM(oi.total_price) as total_revenue, COUNT(DISTINCT o.order_id) as order_appearence_count, COUNT(DISTINCT o.customer_id) as distinct_customer_count FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN orders o ON oi.order_id = o.order_id {where_clause} GROUP BY p.product_id, p.name, p.category ORDER BY total_revenue DESC;"
+
+    if period:
+        period_formats = {
+            'daily': "strftime('%Y-%m-%d', o.created_at)",
+            'week': "strftime('%Y-W%W', o.created_at)",
+            'month': "strftime('%Y-%m', o.created_at)",
+            'bimester': "strftime('%Y', o.created_at) || '-B' || ((strftime('%m', o.created_at) - 1) / 2 + 1)",
+            'quarter': "strftime('%Y', o.created_at) || '-Q' || ((strftime('%m', o.created_at) - 1) / 3 + 1)",
+            'semester': "strftime('%Y', o.created_at) || '-S' || ((strftime('%m', o.created_at) - 1) / 6 + 1)",
+            'year': "strftime('%Y', o.created_at)"
+        }
+        period_format = period_formats.get(period, period_formats['month'])
+        query = f"SELECT p.product_id, p.name as product_name, p.category as product_category, {period_format} as period, SUM(oi.quantity) as total_quantity, SUM(oi.total_price) as total_revenue, COUNT(DISTINCT o.order_id) as order_appearence_count, COUNT(DISTINCT o.customer_id) as distinct_customer_count FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN orders o ON oi.order_id = o.order_id {where_clause} GROUP BY p.product_id, p.name, p.category, period ORDER BY period ASC, total_revenue DESC;"
+    else:
+        query = f"SELECT p.product_id, p.name as product_name, p.category as product_category, SUM(oi.quantity) as total_quantity, SUM(oi.total_price) as total_revenue, COUNT(DISTINCT o.order_id) as order_appearence_count, COUNT(DISTINCT o.customer_id) as distinct_customer_count FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN orders o ON oi.order_id = o.order_id {where_clause} GROUP BY p.product_id, p.name, p.category ORDER BY total_revenue DESC;"
+
     conn = get_db_connection()
     product_data = conn.execute(query, params).fetchall()
     total_revenue_query = f"SELECT SUM(oi.total_price) as grand_total FROM order_items oi JOIN orders o ON oi.order_id = o.order_id {where_clause};"

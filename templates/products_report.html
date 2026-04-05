@@ -9,10 +9,14 @@
         main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
         .controls-container { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; background-color: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .controls-container label { font-weight: bold; }
-        .controls-container input { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .controls-container input, .controls-container select { padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
         .controls-container button { padding: 0.6rem 1rem; color: white; border: none; border-radius: 4px; cursor: pointer; }
         #filter-button { background-color: #007bff; }
         #clear-filter-button { background-color: #6c757d; }
+        #reset-selection-button { background-color: #28a745; }
+        .chart-container { background-color: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 280px; }
+        .chart-container h2 { margin-top: 0; }
+        #product-metrics-chart, #product-quantity-chart { width: 100%; height: 260px !important; max-height: 260px; }
         .reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
         .report-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 0; }
@@ -29,8 +33,34 @@
             <input type="date" id="start-date">
             <label for="end-date">Até:</label>
             <input type="date" id="end-date">
+            <label for="period-selector">Período:</label>
+            <select id="period-selector">
+                <option value="daily">Diário</option>
+                <option value="week">Semanal</option>
+                <option value="month" selected>Mensal</option>
+                <option value="bimester">Bimestre</option>
+                <option value="quarter">Trimestre</option>
+                <option value="semester">Semestre</option>
+                <option value="year">Anual</option>
+            </select>
             <button id="filter-button">Analisar Período</button>
             <button id="clear-filter-button">Limpar Filtro</button>
+        </div>
+
+        <div class="controls-container">
+            <label for="product-selector">Selecione produtos para comparar:</label>
+            <select id="product-selector" multiple size="6"></select>
+            <button id="reset-selection-button">Resetar Seleção</button>
+        </div>
+
+        <div class="chart-container">
+            <h2>Receita por Produto</h2>
+            <canvas id="product-metrics-chart" height="260"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Quantidade Vendida por Produto</h2>
+            <canvas id="product-quantity-chart" height="260"></canvas>
         </div>
 
         <div class="reports-grid">
@@ -66,6 +96,7 @@
             </div>
         </div>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/products_report.js"></script>
 </body>
 </html>

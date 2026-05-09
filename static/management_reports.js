@@ -17,7 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ticket: null,
         revenuePerCustomer: null,
         customerType: null,
-        orderValues: null
+        orderValues: null,
+        cashflow: null,
+        stock: null
     };
 
     function calculateMedian(numbers) {
@@ -94,6 +96,34 @@ document.addEventListener('DOMContentLoaded', () => {
             renderHistogram('orderValues', 'orderValuesHistogram', rawValues, bucketSize);
         } catch (error) {
             console.error("Erro ao carregar dados do histograma:", error);
+        }
+
+        // --- Lógica para os gráficos de cashflow e estoque ---
+        try {
+            let cashflowUrl = `/api/reports/cashflow?period=${period}`;
+            if (startDate && endDate) {
+                cashflowUrl += `&start_date=${startDate}&end_date=${endDate}`;
+            }
+            const response = await fetch(cashflowUrl);
+            if (!response.ok) throw new Error(`Erro na API de cashflow: ${response.statusText}`);
+            const d = await response.json();
+
+            const fmt = v => (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('current-payment-balance').textContent = fmt(d.current_payment_balance);
+            document.getElementById('current-bonus-balance').textContent   = fmt(d.current_bonus_balance);
+
+            const cfLabels  = d.cashflow.map(r => r.period);
+            const cfDirect  = d.cashflow.map(r => r.direct / 100);
+            const cfCredit  = d.cashflow.map(r => r.credit_used / 100);
+            const cfBonus   = d.cashflow.map(r => r.bonus_used / 100);
+            renderCashflowChart(cfLabels, cfDirect, cfCredit, cfBonus);
+
+            const stLabels  = d.stock.map(r => r.period);
+            const stPayment = d.stock.map(r => r.payment_balance / 100);
+            const stBonus   = d.stock.map(r => r.bonus_balance / 100);
+            renderStockChart(stLabels, stPayment, stBonus);
+        } catch (error) {
+            console.error("Erro ao carregar dados de cashflow:", error);
         }
     }
 
@@ -260,6 +290,59 @@ document.addEventListener('DOMContentLoaded', () => {
                     x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: false } }
                 }
             }
+        });
+    }
+
+    function stackedCurrencyOptions(chartKey) {
+        const fmt = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+        return {
+            plugins: {
+                datalabels: {
+                    display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+                    anchor: 'center', align: 'center',
+                    formatter: v => v > 0 ? fmt(v) : '',
+                    color: 'white', font: { size: 10, weight: 'bold' }
+                },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+            },
+            responsive: true,
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true, ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') } }
+            }
+        };
+    }
+
+    function renderCashflowChart(labels, paymentData, creditData, bonusData) {
+        const ctx = document.getElementById('cashflowChart').getContext('2d');
+        if (charts.cashflow) charts.cashflow.destroy();
+        charts.cashflow = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Pagamentos Diretos (Dinheiro/PIX/Cartão)', data: paymentData, backgroundColor: '#28a745', stack: 's' },
+                    { label: 'Crédito Pré-pago Consumido',  data: creditData,  backgroundColor: '#007bff', stack: 's' },
+                    { label: 'Bônus Consumido',             data: bonusData,   backgroundColor: '#fd7e14', stack: 's' }
+                ]
+            },
+            options: stackedCurrencyOptions('cashflow')
+        });
+    }
+
+    function renderStockChart(labels, paymentBalanceData, bonusBalanceData) {
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        if (charts.stock) charts.stock.destroy();
+        charts.stock = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Crédito Pré-pago Disponível', data: paymentBalanceData, backgroundColor: '#007bff', stack: 's' },
+                    { label: 'Bônus Disponível',             data: bonusBalanceData,   backgroundColor: '#fd7e14', stack: 's' }
+                ]
+            },
+            options: stackedCurrencyOptions('stock')
         });
     }
 

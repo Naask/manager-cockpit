@@ -15,7 +15,12 @@
         #clear-filter-button { background-color: #6c757d; }
         .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 2rem; }
         .chart-container { background-color: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .chart-container.full-width { grid-column: 1 / -1; }
         h2 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 0; }
+        .credit-kpis { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .credit-kpi { flex: 1; background: #f8f9fa; border-radius: 6px; padding: 0.6rem 1rem; display: flex; flex-direction: column; gap: 2px; }
+        .credit-kpi span { color: #6c757d; font-size: 0.8rem; }
+        .credit-kpi strong { font-size: 1.1rem; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -75,6 +80,24 @@
             <div class="chart-container">
                 <h2>Distribuição de Valores por Pedido</h2>
                 <canvas id="orderValuesHistogram"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Cashflow: Origem dos Recebimentos</h2>
+                <canvas id="cashflowChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Estoque de Créditos e Bônus dos Clientes</h2>
+                <div class="credit-kpis">
+                    <div class="credit-kpi">
+                        <span>Crédito pré-pago disponível</span>
+                        <strong id="current-payment-balance" style="color:#007bff;">R$ 0,00</strong>
+                    </div>
+                    <div class="credit-kpi">
+                        <span>Bônus disponível</span>
+                        <strong id="current-bonus-balance" style="color:#fd7e14;">R$ 0,00</strong>
+                    </div>
+                </div>
+                <canvas id="stockChart"></canvas>
             </div>
         </div>
     </main>

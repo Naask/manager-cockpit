@@ -2,7 +2,7 @@
 # Servidor Flask para os Cockpits de Operação e Gestão.
 import sqlite3
 from flask import Flask, jsonify, render_template, request
-from datetime import date
+from datetime import date, datetime
 
 app = Flask(__name__)
 
@@ -716,6 +716,157 @@ def cohorts_page():
 
 
 # --- ROTA PARA DADOS DO HISTOGRAMA ---
+@app.route('/api/reports/cashflow')
+def get_cashflow_report():
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    def get_period_key(timestamp_str):
+        try:
+            dt = datetime.fromisoformat(timestamp_str.replace(' ', 'T').split('.')[0])
+        except Exception:
+            return None
+        m = dt.month
+        if period == 'daily':      return dt.strftime('%Y-%m-%d')
+        if period == 'week':       return dt.strftime('%Y-W%W')
+        if period == 'month':      return dt.strftime('%Y-%m')
+        if period == 'bimester':   return f"{dt.year}-B{(m-1)//2+1}"
+        if period == 'trimester':  return f"{dt.year}-Q{(m-1)//3+1}"
+        if period == 'semester':   return f"{dt.year}-S{(m-1)//6+1}"
+        if period == 'year':       return str(dt.year)
+        return dt.strftime('%Y-%m')
+
+    start_pk = get_period_key(start_date + 'T00:00') if start_date else None
+    end_pk   = get_period_key(end_date   + 'T23:59') if end_date   else None
+
+    conn = get_db_connection()
+
+    # Direct payments (non-SALDO): actual cash/card/PIX received for orders.
+    # Grouped here by paid_at timestamp, period key computed in Python below.
+    direct_params = []
+    direct_where  = "WHERE op.method != 'SALDO'"
+    if start_date and end_date:
+        direct_where += " AND op.paid_at BETWEEN ? AND ?"
+        direct_params.extend([start_date + 'T00:00', end_date + 'T23:59'])
+
+    direct_rows = conn.execute(f"""
+        SELECT op.paid_at, op.amount
+        FROM order_payments op
+        {direct_where}
+        ORDER BY op.paid_at ASC
+    """, direct_params).fetchall()
+
+    # All ledger transactions for FIFO balance tracking.
+    # PAYMENT_RECEIVED = customer loaded credit (not a direct order payment).
+    # BONUS_ADDED      = free bonus credited.
+    # SALE             = order charged to balance (corresponds to SALDO in order_payments).
+    all_tx = conn.execute("""
+        SELECT customer_id, timestamp, transaction_type, amount
+        FROM ledger_transactions
+        ORDER BY timestamp ASC, rowid ASC
+    """).fetchall()
+    conn.close()
+
+    # Aggregate direct payments by period
+    direct_by_period = {}
+    for row in direct_rows:
+        pk = get_period_key(row['paid_at'])
+        if pk:
+            direct_by_period[pk] = direct_by_period.get(pk, 0) + row['amount']
+
+    # FIFO balance tracking per customer
+    cust_payment  = {}   # payment credit per customer
+    cust_bonus    = {}   # bonus credit per customer
+    total_payment = 0    # system-wide payment credit running total
+    total_bonus   = 0    # system-wide bonus running total
+
+    fifo_by_period = {}  # period -> {credit_used, bonus_used}
+    stock          = {}  # period -> (payment_balance, bonus_balance) at period end
+
+    for tx in all_tx:
+        cid     = tx['customer_id']
+        pk      = get_period_key(tx['timestamp'])
+        tx_type = tx['transaction_type']
+        amount  = tx['amount']
+        if pk is None:
+            continue
+
+        cust_payment.setdefault(cid, 0)
+        cust_bonus.setdefault(cid, 0)
+        fifo_by_period.setdefault(pk, {'credit_used': 0, 'bonus_used': 0})
+
+        if tx_type == 'PAYMENT_RECEIVED':
+            cust_payment[cid] += amount
+            total_payment     += amount
+
+        elif tx_type == 'BONUS_ADDED':
+            cust_bonus[cid] += amount
+            total_bonus     += amount
+
+        elif tx_type in ('SALE', 'DISCOUNT_APPLIED'):
+            remaining = amount
+
+            # Payment credit consumed first, then bonus credit
+            from_payment = min(remaining, max(0, cust_payment[cid]))
+            cust_payment[cid] -= from_payment
+            total_payment     -= from_payment
+            remaining         -= from_payment
+
+            from_bonus = min(remaining, max(0, cust_bonus[cid]))
+            cust_bonus[cid] -= from_bonus
+            total_bonus     -= from_bonus
+            remaining       -= from_bonus
+
+            # Remaining goes as negative payment credit (customer owes)
+            if remaining > 0:
+                cust_payment[cid] -= remaining
+                total_payment     -= remaining
+
+            if tx_type == 'SALE':
+                fifo_by_period[pk]['credit_used'] += from_payment
+                fifo_by_period[pk]['bonus_used']  += from_bonus
+
+        elif tx_type == 'BALANCE_CORRECTION_CREDIT':
+            cust_payment[cid] += amount
+            total_payment     += amount
+
+        elif tx_type == 'BALANCE_CORRECTION_DEBIT':
+            cust_payment[cid] -= amount
+            total_payment     -= amount
+
+        stock[pk] = (max(0, total_payment), max(0, total_bonus))
+
+    all_periods = sorted(set(direct_by_period) | set(fifo_by_period))
+
+    cashflow_result = []
+    stock_result    = []
+    for pk in all_periods:
+        in_range = (start_pk is None or pk >= start_pk) and (end_pk is None or pk <= end_pk)
+        if not in_range:
+            continue
+
+        fifo = fifo_by_period.get(pk, {'credit_used': 0, 'bonus_used': 0})
+        cashflow_result.append({
+            'period':        pk,
+            'direct':        direct_by_period.get(pk, 0),
+            'credit_used':   fifo['credit_used'],
+            'bonus_used':    fifo['bonus_used']
+        })
+        snap = stock.get(pk, (0, 0))
+        stock_result.append({
+            'period':          pk,
+            'payment_balance': snap[0],
+            'bonus_balance':   snap[1]
+        })
+
+    return jsonify({
+        'cashflow':                cashflow_result,
+        'stock':                   stock_result,
+        'current_payment_balance': max(0, total_payment),
+        'current_bonus_balance':   max(0, total_bonus)
+    })
+
 @app.route('/api/reports/order-values')
 def get_order_values_data():
     start_date = request.args.get('start_date')

@@ -24,6 +24,15 @@
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e9ecef; }
         tfoot td { font-weight: bold; background-color: #f8f9fa; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .section-header h2 { border-bottom: none; padding-bottom: 0; margin: 0; }
+        .pdf-actions { display: flex; align-items: center; gap: 1rem; }
+        .selected-count { color: #6c757d; font-size: 0.9rem; }
+        .btn-pdf { padding: 0.5rem 1.2rem; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: bold; }
+        .btn-pdf:disabled { background-color: #adb5bd; cursor: not-allowed; }
+        .btn-pdf:not(:disabled):hover { background-color: #c82333; }
+        input[type="checkbox"] { cursor: pointer; width: 15px; height: 15px; }
+        th:first-child, td:first-child { width: 36px; text-align: center; }
     </style>
 </head>
 <body>
@@ -115,10 +124,17 @@
         </section>
 
         <section class="report-container">
-            <h2>Todos os Pedidos Concluídos <span>(<span id="all-completed-orders-count">0</span>)</span></h2>
+            <div class="section-header">
+                <h2>Todos os Pedidos Concluídos <span>(<span id="all-completed-orders-count">0</span>)</span></h2>
+                <div class="pdf-actions">
+                    <span id="selected-orders-count" class="selected-count">0 selecionados</span>
+                    <button id="generate-pdf-button" class="btn-pdf" disabled>&#128196; Gerar Relatório PDF</button>
+                </div>
+            </div>
             <table id="all-completed-orders-table">
                 <thead>
                     <tr>
+                        <th><input type="checkbox" id="select-all-completed" title="Selecionar todos"></th>
                         <th>Data Criação</th>
                         <th>Concluído em</th>
                         <th>Pedido #</th>
@@ -129,6 +145,7 @@
                 <tbody></tbody>
                 <tfoot>
                     <tr>
+                        <td></td>
                         <td colspan="4">TOTAL</td>
                         <td id="completed-total-amount">R$ 0,00</td>
                     </tr>
@@ -153,6 +170,8 @@
             </table>
         </section>
     </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="/static/gestao.js"></script>
 </body>
 </html>

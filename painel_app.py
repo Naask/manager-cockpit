@@ -184,6 +184,48 @@ def get_financial_summary():
         'customer_total_balance': customer_total_balance
     })
 
+@app.route('/api/gestao/orders-detail')
+def get_orders_detail():
+    order_ids_str = request.args.get('order_ids', '')
+    order_ids = [oid.strip() for oid in order_ids_str.split(',') if oid.strip()]
+    if not order_ids:
+        return jsonify({'error': 'Nenhum pedido selecionado'}), 400
+
+    conn = get_db_connection()
+    placeholders = ','.join(['?' for _ in order_ids])
+
+    orders = conn.execute(f"""
+        SELECT o.order_id, c.name as customer_name, o.created_at, o.completed_at,
+               o.total_amount, o.payment_status
+        FROM orders o JOIN customers c ON o.customer_id = c.customer_id
+        WHERE o.order_id IN ({placeholders})
+        ORDER BY o.completed_at DESC
+    """, order_ids).fetchall()
+
+    items = conn.execute(f"""
+        SELECT oi.order_id, p.name as product_name, p.category,
+               oi.quantity, oi.unit_price, oi.total_price
+        FROM order_items oi JOIN products p ON oi.product_id = p.product_id
+        WHERE oi.order_id IN ({placeholders})
+        ORDER BY oi.order_item_id
+    """, order_ids).fetchall()
+    conn.close()
+
+    items_by_order = {}
+    for item in items:
+        oid = item['order_id']
+        if oid not in items_by_order:
+            items_by_order[oid] = []
+        items_by_order[oid].append(dict(item))
+
+    result = []
+    for order in orders:
+        order_dict = dict(order)
+        order_dict['items'] = items_by_order.get(order_dict['order_id'], [])
+        result.append(order_dict)
+
+    return jsonify(result)
+
 @app.route('/gestao')
 def gestao_page():
     return render_template('gestao.html')

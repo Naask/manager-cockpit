@@ -747,14 +747,15 @@ def get_cashflow_report():
     direct_params = []
     direct_where  = "WHERE op.method != 'SALDO'"
     if start_date and end_date:
-        direct_where += " AND op.paid_at BETWEEN ? AND ?"
+        direct_where += " AND o.paid_at BETWEEN ? AND ?"
         direct_params.extend([start_date + 'T00:00', end_date + 'T23:59'])
 
     direct_rows = conn.execute(f"""
-        SELECT op.paid_at, op.amount
+        SELECT o.paid_at, op.amount
         FROM order_payments op
+        JOIN orders o ON op.order_id = o.order_id
         {direct_where}
-        ORDER BY op.paid_at ASC
+        ORDER BY o.paid_at ASC
     """, direct_params).fetchall()
 
     # All ledger transactions for FIFO balance tracking.

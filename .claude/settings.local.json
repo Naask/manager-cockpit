@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls -la \"c:/Brilhodev/second-pdv/\" 2>/dev/null | head -30)",
-      "Read(//c/Brilhodev/second-pdv/**)"
+      "Read(//c/Brilhodev/second-pdv/**)",
+      "Bash(python check_integrity.py)"
     ]
   }
 }
